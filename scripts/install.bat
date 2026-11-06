@@ -6,7 +6,7 @@ set "ROOT_DIR=%~dp0..\"
 set "BACKEND_DIR=%ROOT_DIR%backend"
 set "FRONTEND_DIR=%ROOT_DIR%frontend"
 
-echo [install] ShortFilm Agent one-click install
+echo [install] 万象工场 one-click install
 
 where python >nul 2>nul
 if errorlevel 1 (
@@ -74,7 +74,7 @@ if "%SFA_SKIP_FRONTEND_BUILD%"=="1" (
 )
 
 echo.
-echo [install] ShortFilm Agent installation complete.
+echo [install] 万象工场 installation complete.
 echo.
 echo Next steps:
 echo   1. Edit backend API keys:

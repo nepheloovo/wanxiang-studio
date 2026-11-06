@@ -4,7 +4,7 @@ Guidance for Claude Code (and other AI coding tools) working in this repository.
 
 ## Project
 
-ShortFilm Agent is a reusable AIGC base used to teach AI product managers. A user request goes through a multi-stage pipeline (script → character/scene design → storyboard → reference images → video → post-production) with a user confirmation stop after each stage. **Scenario packages** (`backend/scenarios/<id>/`) decide which stages a project uses, their names, default params, home-page copy and domain prompts. Students mostly adapt the base by adding scenario packages.
+万象工场 is a reusable AIGC base used to teach AI product managers. A user request goes through a multi-stage pipeline (script → character/scene design → storyboard → reference images → video → post-production) with a user confirmation stop after each stage. **Scenario packages** (`backend/scenarios/<id>/`) decide which stages a project uses, their names, default params, home-page copy and domain prompts. Students mostly adapt the base by adding scenario packages.
 
 - `backend/`: Python FastAPI (uv-managed, Python 3.12)
 - `frontend/`: Next.js 16 + React 19 + Tailwind 4

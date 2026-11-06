@@ -1,4 +1,4 @@
-# ShortFilm Agent backend configuration.
+# 万象工场 backend configuration.
 # Copy to config.yaml (git-ignored) and fill in keys, or edit them on the frontend Settings page.
 # Every value can also be overridden by an SFA_* environment variable, which is never written
 # back to this file, e.g. SFA_DASHSCOPE_API_KEY, SFA_PORT, SFA_MODEL_LLM. See docs/configuration.md.

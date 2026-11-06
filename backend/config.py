@@ -90,7 +90,7 @@ SECRET_PATHS = tuple(
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "app": {
-        "name": "ShortFilm Agent",
+        "name": "万象工场",
         "tagline": "AI 短片创作 Agent",
     },
     "server": {

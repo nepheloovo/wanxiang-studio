@@ -1,4 +1,4 @@
-<h1 align="center">ShortFilm Agent</h1>
+<h1 align="center">万象工场 · Wanxiang Studio</h1>
 
 <p align="center">
   <b>A reusable AIGC agent base: one workflow engine, adaptable to image and video products in any industry</b>
@@ -12,7 +12,7 @@
 
 ## What it is
 
-ShortFilm Agent turns a one-line request into a multi-stage production pipeline (copy/script → character and scene design → storyboard → images → video → final cut). Every stage produces assets you can **view, confirm, edit and regenerate item by item**, so a human stays in the loop.
+万象工场 turns a one-line request into a multi-stage production pipeline (copy/script → character and scene design → storyboard → images → video → final cut). Every stage produces assets you can **view, confirm, edit and regenerate item by item**, so a human stays in the loop.
 
 Its core concept is the **scenario package**: one folder per industry scenario, declaring which stages it uses, default parameters, home-page copy and its own prompts. The same engine becomes a different product with a different scenario:
 

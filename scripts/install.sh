@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-click installer for ShortFilm Agent.
+# One-click installer for 万象工场.
 
 set -euo pipefail
 
@@ -96,7 +96,7 @@ install_frontend() {
 }
 
 main() {
-  info "ShortFilm Agent one-click install"
+  info "万象工场 one-click install"
   check_python
   check_ffmpeg
   install_backend
@@ -104,7 +104,7 @@ main() {
 
   cat <<EOF
 
-ShortFilm Agent installation complete.
+万象工场 installation complete.
 
 Next steps:
   1. Edit backend API keys:

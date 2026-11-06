@@ -1,12 +1,12 @@
 ﻿---
-name: shortfilm-agent
-description: ShortFilm Agent（AI 短片创作 Agent）视频生成全流程：通过 6 个阶段（剧本→角色/场景设计→分镜→参考图→视频生成→后期剪辑）将用户想法转化为完整视频。支持临时工作台（单独调用 LLM、VLM、文生图、图生图、视频生成）和一次性短流程 Pipeline（文艺短视频、动作迁移、数字人口播）。触发词：视频生成、AI视频、AIGC、创作视频、制作视频、AI画图、文艺短视频、静态短视频、动作迁移、数字人口播。
+name: wanxiang-studio
+description: 万象工场（AIGC 内容生产平台）视频生成全流程：通过 6 个阶段（剧本→角色/场景设计→分镜→参考图→视频生成→后期剪辑）将用户想法转化为完整视频。支持临时工作台（单独调用 LLM、VLM、文生图、图生图、视频生成）和一次性短流程 Pipeline（文艺短视频、动作迁移、数字人口播）。触发词：视频生成、AI视频、AIGC、创作视频、制作视频、AI画图、文艺短视频、静态短视频、动作迁移、数字人口播。
 license: MIT License
 metadata:
   version: "1.0"
 ---
 
-# ShortFilm Agent Skill
+# 万象工场 Skill
 
 > **本地运行**：这是一个**本地部署**的视频生成项目，**前后端都运行在本机**：
 > - 后端：`http://localhost:8000`
@@ -25,7 +25,7 @@ metadata:
 ## 项目结构
 
 ```
-<repo-root>/                      ← ShortFilm Agent 仓库根目录
+<repo-root>/                      ← 万象工场 仓库根目录
 ├── backend/                      ← FastAPI 后端（端口 8000）
 │   ├── api/                      ← API 路由、Schema 和服务
 │   ├── models/                   ← 模型注册、能力标签和模型调用客户端

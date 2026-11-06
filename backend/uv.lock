@@ -1909,7 +1909,7 @@ wheels = [
 ]
 
 [[package]]
-name = "shortfilm-agent-backend"
+name = "wanxiang-studio-backend"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

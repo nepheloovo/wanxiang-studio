@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Entrypoint for the ShortFilm Agent FastAPI server.
+Entrypoint for the 万象工场 FastAPI server.
 """
 
 import os

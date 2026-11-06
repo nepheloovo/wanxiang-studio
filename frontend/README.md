@@ -1,6 +1,6 @@
-# ShortFilm Agent — Frontend
+# 万象工场 — Frontend
 
-Web UI for **ShortFilm Agent**（AI 短片创作 Agent）: chat-driven short-film creation, one-click pipelines and a sandbox workbench. Built with Next.js 16, React 19 and Tailwind CSS 4. It talks to the Python backend in `../backend`.
+Web UI for **万象工场**（AIGC 内容生产平台）: chat-driven short-film creation, one-click pipelines and a sandbox workbench. Built with Next.js 16, React 19 and Tailwind CSS 4. It talks to the Python backend in `../backend`.
 
 ## Commands
 
@@ -20,7 +20,7 @@ Copy `.env.example` to `.env.local` and adjust. All of these are read at **build
 | --- | --- | --- |
 | `BACKEND_API_URL` | `http://127.0.0.1:8000` | Target of the `/api/*` and `/code/*` rewrites in `next.config.ts` |
 | `NEXT_PUBLIC_API_URL` | `http://127.0.0.1:8000` | Base URL the browser uses for direct SSE streaming connections |
-| `NEXT_PUBLIC_APP_NAME` | `ShortFilm Agent` | Product name (page title, sidebar, top bar) |
+| `NEXT_PUBLIC_APP_NAME` | `万象工场` | Product name (page title, sidebar, top bar) |
 | `NEXT_PUBLIC_APP_TAGLINE` | `AI 短片创作 Agent` | Tagline / meta description |
 
 ## Branding
@@ -34,9 +34,9 @@ Branding lives in `config/brand.ts` (`brand.name`, `brand.tagline`, `brand.stora
 ## Docker
 
 ```bash
-docker build -t shortfilm-agent-frontend \
+docker build -t wanxiang-studio-frontend \
   --build-arg BACKEND_API_URL=http://backend:8000 \
   --build-arg NEXT_PUBLIC_API_URL=http://localhost:8000 \
   .
-docker run -p 3000:3000 shortfilm-agent-frontend
+docker run -p 3000:3000 wanxiang-studio-frontend
 ```

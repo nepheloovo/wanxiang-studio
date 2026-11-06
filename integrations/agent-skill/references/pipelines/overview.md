@@ -113,7 +113,7 @@ curl "http://localhost:8000/api/models?media_type=video&ability=digital_human&ve
 
 | 页面 | URL |
 |------|-----|
-| ShortFilm Agent 主流程 | `http://localhost:3000/` |
+| 万象工场 主流程 | `http://localhost:3000/` |
 | 临时工作台 | `http://localhost:3000/sandbox` |
 | 文艺短视频 | `http://localhost:3000/pipelines/standard` |
 | 动作迁移 | `http://localhost:3000/pipelines/action-transfer` |

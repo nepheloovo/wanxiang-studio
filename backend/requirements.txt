@@ -1,4 +1,4 @@
-# ShortFilm Agent backend dependencies (mirror of pyproject.toml for pip installs)
+# 万象工场 backend dependencies (mirror of pyproject.toml for pip installs)
 # Python 3.10+
 
 # Web Framework

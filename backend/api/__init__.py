@@ -1,1 +1,1 @@
-"""FastAPI application package for the ShortFilm Agent backend."""
+"""FastAPI application package for the 万象工场 backend."""
