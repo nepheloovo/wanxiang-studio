@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CheckCircle, Loader2, Save, Settings, XCircle } from 'lucide-react';
+import { CheckCircle, ChevronDown, Loader2, Save, XCircle } from 'lucide-react';
 import BrandHeader from '@/components/BrandHeader';
 import { fetchModelGroupsByType, fetchVideoModelGroupsByAbility } from '@/lib/modelRegistry';
 import {
@@ -34,117 +34,130 @@ const EMPTY_MODEL_SELECTS: Record<ModelSelectKey, ProviderGroup[]> = {
 };
 
 const LOG_LEVEL_OPTIONS = [
-  { id: 'DEBUG', label: 'DEBUG - 最详细' },
-  { id: 'INFO', label: 'INFO - 常规' },
-  { id: 'WARNING', label: 'WARNING - 仅警告及错误' },
-  { id: 'ERROR', label: 'ERROR - 仅错误' },
-  { id: 'CRITICAL', label: 'CRITICAL - 严重错误' },
+  { id: 'DEBUG', label: '最详细（排查问题用）' },
+  { id: 'INFO', label: '常规（推荐）' },
+  { id: 'WARNING', label: '只记警告和错误' },
+  { id: 'ERROR', label: '只记错误' },
+  { id: 'CRITICAL', label: '只记严重错误' },
 ];
 
-const GROUPS: Array<{ title: string; description: string; fields: Field[] }> = [
+type ProviderCard = {
+  id: string;
+  name: string;
+  hint: string;
+  keyFields: Field[];
+  advancedFields: Field[];
+};
+
+/** 模型服务账号：常用的放前面；只露出 Key，接口地址 / 代理放进高级设置 */
+const PROVIDERS: ProviderCard[] = [
   {
-    title: 'API Server',
-    description: '服务启动与日志配置。host / port 保存后需要重启后端完全生效。',
-    fields: [
-      { path: 'server.host', label: 'host 主机地址' },
-      { path: 'server.port', label: 'port 端口', type: 'number' },
-      { path: 'server.log_level', label: 'log_level 日志层级', type: 'select', options: LOG_LEVEL_OPTIONS },
-      { path: 'server.access_log', label: 'access_log 请求访问日志', type: 'boolean' },
+    id: 'dashscope',
+    name: '阿里云百炼',
+    hint: '通义千问（写剧本）、通义万相（画图、视频）',
+    keyFields: [{ path: 'api_providers.dashscope.api_key', label: 'API Key', type: 'password' }],
+    advancedFields: [
+      { path: 'api_providers.dashscope.base_url', label: '接口地址' },
+      { path: 'api_providers.dashscope.enable_proxy', label: '通过代理访问', type: 'boolean' },
     ],
   },
   {
-    title: 'Common Provider Settings',
-    description: '模型调用公共配置和代理设置。',
-    fields: [
-      { path: 'api_providers.common.print_model_input', label: 'print_model_input 打印模型输入', type: 'boolean' },
-      { path: 'api_providers.common.proxy', label: 'proxy 代理地址' },
+    id: 'ark',
+    name: '火山方舟',
+    hint: '豆包 Seedream（画图）、Seedance（视频）',
+    keyFields: [{ path: 'api_providers.ark.api_key', label: 'API Key', type: 'password' }],
+    advancedFields: [
+      { path: 'api_providers.ark.base_url', label: '接口地址' },
+      { path: 'api_providers.ark.enable_proxy', label: '通过代理访问', type: 'boolean' },
     ],
   },
   {
-    title: 'OpenAI',
-    description: 'OpenAI / 兼容 OpenAI 接口配置。',
-    fields: [
-      { path: 'api_providers.openai.api_key', label: 'api_key API 密钥', type: 'password' },
-      { path: 'api_providers.openai.base_url', label: 'base_url 接口地址' },
-      { path: 'api_providers.openai.enable_proxy', label: 'enable_proxy 启用代理', type: 'boolean' },
+    id: 'kling',
+    name: '可灵',
+    hint: '可灵视频生成',
+    keyFields: [
+      { path: 'api_providers.kling.access_key', label: 'Access Key', type: 'password' },
+      { path: 'api_providers.kling.secret_key', label: 'Secret Key', type: 'password' },
+    ],
+    advancedFields: [
+      { path: 'api_providers.kling.base_url', label: '接口地址' },
+      { path: 'api_providers.kling.enable_proxy', label: '通过代理访问', type: 'boolean' },
     ],
   },
   {
-    title: 'Gemini',
-    description: 'Gemini 及兼容接口配置。',
-    fields: [
-      { path: 'api_providers.gemini.api_key', label: 'api_key API 密钥', type: 'password' },
-      { path: 'api_providers.gemini.base_url', label: 'base_url 接口地址' },
-      { path: 'api_providers.gemini.enable_proxy', label: 'enable_proxy 启用代理', type: 'boolean' },
+    id: 'deepseek',
+    name: 'DeepSeek',
+    hint: 'DeepSeek 文本模型',
+    keyFields: [{ path: 'api_providers.deepseek.api_key', label: 'API Key', type: 'password' }],
+    advancedFields: [
+      { path: 'api_providers.deepseek.base_url', label: '接口地址' },
+      { path: 'api_providers.deepseek.enable_proxy', label: '通过代理访问', type: 'boolean' },
     ],
   },
   {
-    title: 'DeepSeek',
-    description: 'DeepSeek 接口配置。',
-    fields: [
-      { path: 'api_providers.deepseek.api_key', label: 'api_key API 密钥', type: 'password' },
-      { path: 'api_providers.deepseek.base_url', label: 'base_url 接口地址' },
-      { path: 'api_providers.deepseek.enable_proxy', label: 'enable_proxy 启用代理', type: 'boolean' },
+    id: 'openai',
+    name: 'OpenAI',
+    hint: 'GPT 系列（国内通常需要代理）',
+    keyFields: [{ path: 'api_providers.openai.api_key', label: 'API Key', type: 'password' }],
+    advancedFields: [
+      { path: 'api_providers.openai.base_url', label: '接口地址' },
+      { path: 'api_providers.openai.enable_proxy', label: '通过代理访问', type: 'boolean' },
     ],
   },
   {
-    title: 'DashScope',
-    description: '通义千问、通义万相等 DashScope 服务配置。',
+    id: 'gemini',
+    name: 'Google Gemini',
+    hint: 'Gemini 系列（国内通常需要代理）',
+    keyFields: [{ path: 'api_providers.gemini.api_key', label: 'API Key', type: 'password' }],
+    advancedFields: [
+      { path: 'api_providers.gemini.base_url', label: '接口地址' },
+      { path: 'api_providers.gemini.enable_proxy', label: '通过代理访问', type: 'boolean' },
+    ],
+  },
+];
+
+/** 默认模型：用大白话说明每个模型用在哪 */
+const MODEL_FIELDS: Array<Field & { key: ModelSelectKey; use: string }> = [
+  { key: 'llm', use: '文字', path: 'models.llm', label: '写剧本、分镜', type: 'select' },
+  { key: 'vlm', use: '看图', path: 'models.vlm', label: '检查画面', type: 'select' },
+  { key: 'image_t2i', use: '图片', path: 'models.image_t2i', label: '画图（文字生成图片）', type: 'select' },
+  { key: 'image_it2i', use: '图片', path: 'models.image_it2i', label: '改图（参考图片生成）', type: 'select' },
+  { key: 'video_first_frame', use: '视频', path: 'models.video_first_frame', label: '视频（用首帧画面生成）', type: 'select' },
+  { key: 'video_start_end', use: '视频', path: 'models.video_start_end', label: '视频（用首尾两帧生成）', type: 'select' },
+  { key: 'video_reference', use: '视频', path: 'models.video_reference', label: '视频（用参考图生成）', type: 'select' },
+];
+
+const GENERATION_FIELDS: Field[] = [
+  { path: 'generation.style', label: '画面风格', type: 'select', options: STYLES },
+  { path: 'generation.video_ratio', label: '画面比例', type: 'select', options: VIDEO_RATIOS },
+  { path: 'generation.video_resolution', label: '清晰度', type: 'select', options: VIDEO_RESOLUTIONS },
+  { path: 'generation.video_generation_mode', label: '视频生成方式', type: 'select', options: VIDEO_GENERATION_MODES },
+];
+
+const ADVANCED_GROUPS: Array<{ title: string; description: string; fields: Field[] }> = [
+  {
+    title: '网络代理',
+    description: '只有访问海外服务（OpenAI、Gemini）时才需要。填好后在对应服务里打开「通过代理访问」。',
+    fields: [{ path: 'api_providers.common.proxy', label: '代理地址，例如 http://127.0.0.1:7890' }],
+  },
+  {
+    title: '其他兼容服务',
+    description: '接入 vLLM、Ollama、OpenRouter 等兼容 OpenAI 的服务。模型需要在 config.yaml 的 custom_models 里登记。',
     fields: [
-      { path: 'api_providers.dashscope.api_key', label: 'api_key API 密钥', type: 'password' },
-      { path: 'api_providers.dashscope.base_url', label: 'base_url 接口地址' },
-      { path: 'api_providers.dashscope.enable_proxy', label: 'enable_proxy 启用代理', type: 'boolean' },
+      { path: 'api_providers.openai_compatible.api_key', label: 'API Key', type: 'password' },
+      { path: 'api_providers.openai_compatible.base_url', label: '接口地址' },
+      { path: 'api_providers.openai_compatible.enable_proxy', label: '通过代理访问', type: 'boolean' },
     ],
   },
   {
-    title: 'ARK',
-    description: 'Seedream / Seedance 使用的火山方舟配置。',
+    title: '后端服务',
+    description: '地址和端口修改后需要重启后端才生效，一般不用动。',
     fields: [
-      { path: 'api_providers.ark.api_key', label: 'api_key API 密钥', type: 'password' },
-      { path: 'api_providers.ark.base_url', label: 'base_url 接口地址' },
-      { path: 'api_providers.ark.enable_proxy', label: 'enable_proxy 启用代理', type: 'boolean' },
-    ],
-  },
-  {
-    title: 'Kling',
-    description: '可灵视频生成接口配置。',
-    fields: [
-      { path: 'api_providers.kling.base_url', label: 'base_url 接口地址' },
-      { path: 'api_providers.kling.access_key', label: 'access_key 访问密钥', type: 'password' },
-      { path: 'api_providers.kling.secret_key', label: 'secret_key 私密密钥', type: 'password' },
-      { path: 'api_providers.kling.enable_proxy', label: 'enable_proxy 启用代理', type: 'boolean' },
-    ],
-  },
-  {
-    title: 'OpenAI Compatible',
-    description: '任意 OpenAI 兼容接口（vLLM、Ollama、OpenRouter 等）。模型需在 config.yaml 的 custom_models 中以 provider: openai_compatible 注册。',
-    fields: [
-      { path: 'api_providers.openai_compatible.api_key', label: 'api_key API 密钥', type: 'password' },
-      { path: 'api_providers.openai_compatible.base_url', label: 'base_url 接口地址' },
-      { path: 'api_providers.openai_compatible.enable_proxy', label: 'enable_proxy 启用代理', type: 'boolean' },
-    ],
-  },
-  {
-    title: 'Default Models',
-    description: '主流程和 Pipeline 使用的默认模型。',
-    fields: [
-      { path: 'models.llm', label: 'llm 文本模型', type: 'select', options: [] },
-      { path: 'models.vlm', label: 'vlm 视觉语言模型', type: 'select', options: [] },
-      { path: 'models.image_it2i', label: 'image_it2i 图生图模型', type: 'select', options: [] },
-      { path: 'models.image_t2i', label: 'image_t2i 文生图模型', type: 'select', options: [] },
-      { path: 'models.video_first_frame', label: 'video_first_frame 首帧生视频模型', type: 'select', options: [] },
-      { path: 'models.video_start_end', label: 'video_start_end 首尾帧生视频模型', type: 'select', options: [] },
-      { path: 'models.video_reference', label: 'video_reference 参考图生视频模型', type: 'select', options: [] },
-    ],
-  },
-  {
-    title: '视频生成配置',
-    description: '只对主流程生效：选择视频生成方式、风格、画幅比例和视频分辨率。',
-    fields: [
-      { path: 'generation.video_generation_mode', label: 'video_generation_mode 视频生成方式', type: 'select', options: VIDEO_GENERATION_MODES },
-      { path: 'generation.style', label: 'style 风格', type: 'select', options: STYLES },
-      { path: 'generation.video_ratio', label: 'video_ratio 视频长宽比', type: 'select', options: VIDEO_RATIOS },
-      { path: 'generation.video_resolution', label: 'video_resolution 视频分辨率', type: 'select', options: VIDEO_RESOLUTIONS },
+      { path: 'server.host', label: '地址' },
+      { path: 'server.port', label: '端口', type: 'number' },
+      { path: 'server.log_level', label: '日志详细程度', type: 'select', options: LOG_LEVEL_OPTIONS },
+      { path: 'server.access_log', label: '记录每次请求', type: 'boolean' },
+      { path: 'api_providers.common.print_model_input', label: '在日志里打印发给模型的内容', type: 'boolean' },
     ],
   },
 ];
@@ -185,7 +198,7 @@ function selectHasValue(options: unknown, value: string): boolean {
   if (!Array.isArray(options)) return false;
   return options.some((item: any) => (Array.isArray(item?.models)
     ? item.models.some((model: any) => model.id === value)
-    : String(item?.value ?? item) === value));
+    : String(item?.id ?? item?.value ?? item) === value));
 }
 
 function isProviderOptions(options: Field['options']): options is ProviderGroup[] {
@@ -249,22 +262,30 @@ export default function SettingsPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const groups = GROUPS.map(group => {
-    if (group.title !== 'Default Models') return group;
-    return {
-      ...group,
-      fields: group.fields.map(field => {
-        if (field.path === 'models.llm') return { ...field, options: modelSelects.llm };
-        if (field.path === 'models.vlm') return { ...field, options: modelSelects.vlm };
-        if (field.path === 'models.image_it2i') return { ...field, options: modelSelects.image_it2i };
-        if (field.path === 'models.image_t2i') return { ...field, options: modelSelects.image_t2i };
-        if (field.path === 'models.video_first_frame') return { ...field, options: modelSelects.video_first_frame };
-        if (field.path === 'models.video_start_end') return { ...field, options: modelSelects.video_start_end };
-        if (field.path === 'models.video_reference') return { ...field, options: modelSelects.video_reference };
-        return field;
-      }),
-    };
-  });
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  /** 某个模型 id 属于哪个服务 */
+  const providerOfModel = (modelId: string): string | undefined => {
+    for (const groups of Object.values(modelSelects)) {
+      for (const group of groups) {
+        if (group.models.some(model => model.id === modelId)) return group.provider;
+      }
+    }
+    return undefined;
+  };
+
+  /** 当前默认模型用到的服务，以及它们服务于哪些用途 */
+  const providerUsage: Record<string, string[]> = {};
+  for (const field of MODEL_FIELDS) {
+    const modelId = String(getValue(config, field.path) || '');
+    const provider = modelId ? providerOfModel(modelId) : undefined;
+    if (!provider) continue;
+    const uses = (providerUsage[provider] ||= []);
+    if (!uses.includes(field.use)) uses.push(field.use);
+  }
+
+  const keyFilled = (card: ProviderCard) => card.keyFields.every(field => String(getValue(config, field.path) || '').trim() !== '');
+  const missingProviders = PROVIDERS.filter(card => providerUsage[card.id] && !keyFilled(card));
 
   const updateField = (field: Field, raw: string | boolean) => {
     const value = field.type === 'number' ? Number(raw) || 0 : raw;
@@ -286,7 +307,7 @@ export default function SettingsPage() {
       setConfig(data.config || {});
       setPath(data.path || '');
       setSecretDrafts({});
-      setMessage('配置已保存');
+      setMessage('已保存');
     } catch (e: any) {
       setError(e.message || '保存配置失败');
     } finally {
@@ -299,105 +320,202 @@ export default function SettingsPage() {
     setConfig(current => setValue(current, field.path, raw));
   };
 
+  const renderInput = (field: Field, options?: Field['options']) => {
+    const value = getValue(config, field.path);
+    if (field.type === 'boolean') {
+      const on = Boolean(value);
+      return (
+        <button
+          type="button"
+          role="switch"
+          aria-checked={on}
+          onClick={() => updateField(field, !on)}
+          className="flex h-10 items-center gap-2 text-sm text-gray-600"
+        >
+          <span className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full transition-colors ${on ? 'bg-neutral-900' : 'bg-gray-200'}`}>
+            <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-4' : 'translate-x-0.5'}`} />
+          </span>
+          {on ? '已开启' : '已关闭'}
+        </button>
+      );
+    }
+    if (field.type === 'select') {
+      const opts = options ?? field.options;
+      return (
+        <select
+          value={String(value ?? '')}
+          onChange={event => updateField(field, event.target.value)}
+          className="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-neutral-300"
+        >
+          {value !== undefined && value !== null && String(value) !== '' && !selectHasValue(opts, String(value)) && (
+            <option value={String(value)}>{String(value)}（当前配置）</option>
+          )}
+          {isProviderOptions(opts) ? (
+            opts.map(group => (
+              <optgroup key={group.provider} label={group.label}>
+                {group.models.map(model => (
+                  <option key={model.id} value={model.id}>{model.label}</option>
+                ))}
+              </optgroup>
+            ))
+          ) : (
+            (opts || []).map(option => (
+              <option key={option.id} value={option.id}>{option.label}</option>
+            ))
+          )}
+        </select>
+      );
+    }
+    if (field.type === 'password') {
+      return (
+        <input
+          type="password"
+          value={secretDrafts[field.path] ?? maskSecret(value)}
+          onFocus={event => event.currentTarget.select()}
+          onChange={event => updateSecretField(field, event.target.value)}
+          placeholder="粘贴你的 Key"
+          autoComplete="off"
+          className="h-10 rounded-lg border border-gray-200 bg-white px-3 font-mono text-sm text-gray-700 outline-none focus:border-neutral-300"
+        />
+      );
+    }
+    return (
+      <input
+        type={field.type === 'number' ? 'number' : 'text'}
+        value={String(value ?? '')}
+        onChange={event => updateField(field, event.target.value)}
+        className="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-neutral-300"
+      />
+    );
+  };
+
+  const renderField = (field: Field, options?: Field['options']) => (
+    <label key={field.path} className="flex min-w-0 flex-col gap-1.5">
+      <span className="text-xs font-medium text-gray-500">{field.label}</span>
+      {renderInput(field, options)}
+    </label>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50/50">
-      <BrandHeader />
-      <main className="w-full max-w-6xl mx-auto px-6 pt-10 pb-12">
-        <div className="mb-8 text-center">
-          <div className="inline-flex items-center gap-2 mb-3">
-            <Settings className="w-7 h-7 text-neutral-900" />
-            <h1 className="text-2xl font-bold text-gray-800">设置</h1>
-          </div>
-          <p className="text-sm text-gray-500">
-            修改后端配置并保存到 <span className="font-mono">{formatConfigPath(path)}</span>
-          </p>
+      <BrandHeader title="设置" />
+      <main className="mx-auto w-full max-w-4xl px-4 pb-12 pt-8 sm:px-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">设置</h1>
+          <p className="mt-1 text-sm text-gray-500">填好模型服务的 Key 就能开始创作。改完记得点底部的「保存」。</p>
         </div>
 
         {loading ? (
-          <div className="h-56 rounded-2xl border border-gray-200 bg-white flex items-center justify-center text-sm text-gray-400">
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          <div className="flex h-56 items-center justify-center rounded-2xl border border-gray-200 bg-white text-sm text-gray-400">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             正在读取配置
           </div>
         ) : (
           <div className="space-y-5">
-            {groups.map(group => (
-              <section key={group.title} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                <div className="mb-4">
-                  <h2 className="text-sm font-semibold text-gray-800">{group.title}</h2>
-                  <p className="mt-1 text-xs text-gray-500">{group.description}</p>
+            {missingProviders.length > 0 && (
+              <div className="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-600">
+                <XCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                <span>
+                  现在默认用到的 {missingProviders.map(card => `「${card.name}」`).join('、')} 还没填 Key，生成时会失败。请在下方填写，或换成已填 Key 的模型。
+                </span>
+              </div>
+            )}
+
+            <section className="rounded-2xl border border-gray-200 bg-white p-5">
+              <h2 className="text-sm font-semibold text-gray-800">1. 模型服务账号</h2>
+              <p className="mt-1 text-xs text-gray-500">AI 能力来自这些服务。至少填一个，推荐阿里云百炼（文字、图片、视频都能用）。</p>
+              <div className="mt-4 divide-y divide-gray-100">
+                {PROVIDERS.map(card => {
+                  const filled = keyFilled(card);
+                  const usage = providerUsage[card.id];
+                  return (
+                    <div key={card.id} className="grid grid-cols-1 gap-3 py-4 first:pt-0 last:pb-0 md:grid-cols-[200px_1fr]">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-800">{card.name}</span>
+                          <span className={`rounded px-1.5 py-0.5 text-[10px] ${filled ? 'bg-green-50 text-green-600' : usage ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-gray-400'}`}>
+                            {filled ? '已填写' : usage ? '需要填写' : '未填写'}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-gray-400">{card.hint}</p>
+                        {usage && <p className="mt-1 text-xs text-gray-500">正在用于：{usage.join('、')}</p>}
+                      </div>
+                      <div className={`grid gap-3 ${card.keyFields.length > 1 ? 'sm:grid-cols-2' : ''}`}>
+                        {card.keyFields.map(field => renderField(field))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-gray-200 bg-white p-5">
+              <h2 className="text-sm font-semibold text-gray-800">2. 默认使用的模型</h2>
+              <p className="mt-1 text-xs text-gray-500">每次新建作品时默认用这些模型，创作时也可以临时更换。</p>
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                {MODEL_FIELDS.map(field => renderField(field, modelSelects[field.key]))}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-gray-200 bg-white p-5">
+              <h2 className="text-sm font-semibold text-gray-800">3. 默认画面效果</h2>
+              <p className="mt-1 text-xs text-gray-500">各类型作品有自己的默认值，这里是兜底设置。</p>
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                {GENERATION_FIELDS.map(field => renderField(field))}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-gray-200 bg-white p-5">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(value => !value)}
+                className="flex w-full items-center justify-between text-left"
+                aria-expanded={showAdvanced}
+              >
+                <span>
+                  <span className="block text-sm font-semibold text-gray-800">高级设置</span>
+                  <span className="mt-1 block text-xs text-gray-500">接口地址、网络代理、后端服务。一般不用改。</span>
+                </span>
+                <ChevronDown className={`h-4 w-4 flex-shrink-0 text-gray-400 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+              </button>
+              {showAdvanced && (
+                <div className="mt-5 space-y-6">
+                  {ADVANCED_GROUPS.map(group => (
+                    <div key={group.title}>
+                      <h3 className="text-xs font-semibold text-gray-700">{group.title}</h3>
+                      <p className="mt-1 text-xs text-gray-400">{group.description}</p>
+                      <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                        {group.fields.map(field => renderField(field))}
+                      </div>
+                    </div>
+                  ))}
+                  <div>
+                    <h3 className="text-xs font-semibold text-gray-700">各服务的接口地址</h3>
+                    <p className="mt-1 text-xs text-gray-400">用官方服务时保持默认即可。</p>
+                    <div className="mt-3 space-y-3">
+                      {PROVIDERS.map(card => (
+                        <div key={card.id} className="grid grid-cols-1 gap-3 md:grid-cols-[120px_1fr_160px] md:items-end">
+                          <span className="pb-2.5 text-xs text-gray-500">{card.name}</span>
+                          {card.advancedFields.map(field => renderField(field))}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400">配置文件位置：<span className="font-mono">{formatConfigPath(path)}</span></p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {group.fields.map(field => {
-                    const value = getValue(config, field.path);
-                    return (
-                      <label key={field.path} className="flex flex-col gap-1.5 min-w-0">
-                        <span className="text-xs font-medium text-gray-500">{field.label}</span>
-                        {field.type === 'boolean' ? (
-                          <select
-                            value={String(Boolean(value))}
-                            onChange={event => updateField(field, event.target.value === 'true')}
-                            className="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-neutral-300"
-                          >
-                            <option value="true">true</option>
-                            <option value="false">false</option>
-                          </select>
-                        ) : field.type === 'select' ? (
-                          <select
-                            value={String(value ?? '')}
-                            onChange={event => updateField(field, event.target.value)}
-                            className="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-neutral-300"
-                          >
-                            {value !== undefined && value !== null && String(value) !== '' && !selectHasValue(field.options, String(value)) && (
-                              <option value={String(value)}>{String(value)}（当前配置）</option>
-                            )}
-                            {isProviderOptions(field.options) ? (
-                              field.options.map(group => (
-                                <optgroup key={group.provider} label={group.label}>
-                                  {group.models.map(model => (
-                                    <option key={model.id} value={model.id}>{model.label}</option>
-                                  ))}
-                                </optgroup>
-                              ))
-                            ) : (
-                              (field.options || []).map(option => (
-                                <option key={option.id} value={option.id}>{option.label}</option>
-                              ))
-                            )}
-                          </select>
-                        ) : field.type === 'password' ? (
-                          <input
-                            type="password"
-                            value={secretDrafts[field.path] ?? maskSecret(value)}
-                            onFocus={event => event.currentTarget.select()}
-                            onChange={event => updateSecretField(field, event.target.value)}
-                            placeholder="输入新密钥覆盖"
-                            className="h-10 rounded-lg border border-gray-200 bg-white px-3 font-mono text-sm text-gray-700 outline-none focus:border-neutral-300"
-                          />
-                        ) : (
-                          <input
-                            type={field.type === 'number' ? 'number' : 'text'}
-                            value={String(value ?? '')}
-                            onChange={event => updateField(field, event.target.value)}
-                            className="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-neutral-300"
-                          />
-                        )}
-                      </label>
-                    );
-                  })}
-                </div>
-              </section>
-            ))}
+              )}
+            </section>
 
             <div className="sticky bottom-4 flex items-center gap-3 rounded-2xl border border-gray-200 bg-white/95 p-3 shadow-lg backdrop-blur">
               {message && (
                 <span className="flex items-center gap-1.5 text-sm text-green-600">
-                  <CheckCircle className="w-4 h-4" />
+                  <CheckCircle className="h-4 w-4" />
                   {message}
                 </span>
               )}
               {error && (
                 <span className="flex items-center gap-1.5 text-sm text-red-600">
-                  <XCircle className="w-4 h-4" />
+                  <XCircle className="h-4 w-4" />
                   {error}
                 </span>
               )}
@@ -406,8 +524,8 @@ export default function SettingsPage() {
                 disabled={saving}
                 className="ml-auto flex items-center gap-2 rounded-xl bg-neutral-900 px-5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-700 disabled:cursor-not-allowed disabled:bg-gray-200"
               >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                保存配置
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                保存
               </button>
             </div>
           </div>

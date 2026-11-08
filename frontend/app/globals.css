@@ -243,7 +243,7 @@ body {
 }
 
 .sfa-sidebar-link {
-    min-height: 44px;
+    min-height: 40px;
     padding-inline: 12px !important;
     border-radius: var(--lp-radius-control) !important;
     color: var(--lp-text-muted) !important;
@@ -263,8 +263,7 @@ body {
 }
 
 .sfa-task-panel {
-    min-height: 144px;
-    padding: 16px !important;
+    padding: 12px 16px !important;
     border-top: 1px solid var(--lp-border-divider) !important;
 }
 
@@ -274,7 +273,11 @@ body {
     font-weight: 500;
 }
 
-.sfa-task-panel > div:last-child > div:not(.space-y-1\.5) {
+.sfa-task-panel-filled {
+    min-height: 144px;
+}
+
+.sfa-task-panel > div:last-child > div:not(.space-y-1\.5):not(.sfa-task-empty) {
     border-color: transparent !important;
     background: var(--lp-surface-subtle);
     color: var(--lp-text-subtle) !important;

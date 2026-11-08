@@ -7,7 +7,7 @@ export default function ActionTransferPipelinePage() {
       <PipelinePage
         pipeline="action_transfer"
         title="动作迁移"
-        subtitle="用参考图片和动作视频生成角色动作迁移结果"
+        subtitle="上传一张人物图和一段动作视频，让图里的人做出同样的动作"
       />
     </Suspense>
   );

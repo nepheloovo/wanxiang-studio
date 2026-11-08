@@ -85,12 +85,42 @@ const TEMPLATE_TEXT_DEFAULTS = {
 };
 
 const TEMPLATE_FIELD_LABELS: Record<string, string> = {
-  author: 'author',
-  describe: 'describe',
-  brand: 'brand',
-  signature: 'signature',
-  subtitle: 'subtitle',
+  author: '作者',
+  describe: '简介',
+  brand: '品牌名',
+  signature: '署名',
+  subtitle: '副标题',
 };
+
+/** 模版英文名 → 中文名（后端模版文件名是英文） */
+const TEMPLATE_LABELS_ZH: Record<string, string> = {
+  'Blur Card': '模糊卡片',
+  'Book': '书页',
+  'Default': '默认',
+  'Elegant': '优雅',
+  'Excerpt': '书摘',
+  'Fashion Vintage': '复古时尚',
+  'Film': '电影胶片',
+  'Full': '满屏大图',
+  'Healing': '治愈',
+  'Life Insights': '人生感悟',
+  'Life Insights Light': '人生感悟·浅色',
+  'Long Text': '长文',
+  'Minimal Framed': '极简边框',
+  'Modern': '现代',
+  'Neon': '霓虹',
+  'Psychology Card': '心理学卡片',
+  'Purple': '紫色',
+  'Satirical Cartoon': '讽刺漫画',
+  'Simple Black': '简约黑',
+  'Simple Line Drawing': '简笔线条',
+  'Ultrawide Minimal': '超宽极简',
+  'Wide Darktech': '宽屏暗黑科技',
+};
+
+function templateLabel(label: string): string {
+  return TEMPLATE_LABELS_ZH[label] || label;
+}
 
 const TTS_VOICE_GROUPS: ProviderGroup[] = [
   {
@@ -185,6 +215,18 @@ function groupApiModels(models: ApiModelOption[]): ProviderGroup[] {
       return { ...model, default: Boolean(source?.api_contract_verified) };
     }),
   }));
+}
+
+/** 设置页里配置的默认模型（优先选它，避免默认选到没填 Key 的服务） */
+async function fetchConfiguredModels(): Promise<Record<string, string>> {
+  try {
+    const resp = await fetch('/api/config');
+    if (!resp.ok) return {};
+    const data = await resp.json();
+    return data?.config?.models || {};
+  } catch {
+    return {};
+  }
 }
 
 function firstModelId(groups: ProviderGroup[], preferred?: string) {
@@ -530,12 +572,12 @@ function TemplatePreviewCard({
         'group flex-shrink-0 rounded-lg border bg-white p-1.5 text-left transition-all',
         selected ? 'border-neutral-400 ring-2 ring-cream/10' : 'border-gray-200 hover:border-neutral-300 hover:shadow-sm'
       )}
-      title={template.label}
+      title={templateLabel(template.label)}
     >
       <div className={clsx('relative overflow-hidden rounded-md bg-gray-100', ratioClass)}>
         <iframe
           src={template.preview_url}
-          title={template.label}
+          title={templateLabel(template.label)}
           className="pointer-events-none absolute left-0 top-0 border-0 bg-white"
           style={{
             width: template.width,
@@ -546,7 +588,7 @@ function TemplatePreviewCard({
         />
       </div>
       <div className="mt-1 max-w-36 truncate text-[10px] font-medium text-gray-500 group-hover:text-neutral-700">
-        {template.label}
+        {templateLabel(template.label)}
       </div>
     </button>
   );
@@ -721,20 +763,21 @@ export default function PipelinePage({ pipeline, title, subtitle }: PipelinePage
       setNegativePrompt(current => current || DEFAULT_STANDARD_STYLE_CONTROL);
     }
 
-    fetchApiModels({ mediaType: 'image', ability: imageAbility, verifiedOnly: true })
-      .then(models => {
+    const configuredPromise = fetchConfiguredModels();
+    Promise.all([fetchApiModels({ mediaType: 'image', ability: imageAbility, verifiedOnly: true }), configuredPromise])
+      .then(([models, configured]) => {
         const groups = groupApiModels(models);
         setImageModelGroups(groups);
-        setImageModel(current => firstModelId(groups, current));
+        setImageModel(current => firstModelId(groups, current || configured.image_it2i || configured.image_t2i));
       })
       .catch(() => {});
 
     if (pipeline !== 'standard' || standardVideoMode === 'dynamic_video' || (templateMode && templateMediaKind === 'video')) {
-      fetchApiModels({ mediaType: 'video', ability: videoAbility, verifiedOnly: true })
-        .then(models => {
+      Promise.all([fetchApiModels({ mediaType: 'video', ability: videoAbility, verifiedOnly: true }), configuredPromise])
+        .then(([models, configured]) => {
           const groups = groupApiModels(models);
           setVideoModelGroups(groups);
-          setVideoModel(current => firstModelId(groups, current));
+          setVideoModel(current => firstModelId(groups, current || configured.video_first_frame || configured.video));
         })
         .catch(() => {});
     }
@@ -742,11 +785,11 @@ export default function PipelinePage({ pipeline, title, subtitle }: PipelinePage
 
   useEffect(() => {
     let cancelled = false;
-    fetchModelGroupsByType('llm')
-      .then(groups => {
+    Promise.all([fetchModelGroupsByType('llm'), fetchConfiguredModels()])
+      .then(([groups, configured]) => {
         if (cancelled) return;
         setLlmModelGroups(groups);
-        setLlmModel(current => firstModelId(groups, current));
+        setLlmModel(current => firstModelId(groups, current || configured.llm));
       })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -950,7 +993,7 @@ export default function PipelinePage({ pipeline, title, subtitle }: PipelinePage
 
   return (
     <div className="min-h-screen bg-gray-50/50 overflow-y-auto">
-      <BrandHeader />
+      <BrandHeader title={title} />
 
       <div className="w-full max-w-6xl mx-auto px-6 pt-10 pb-8">
         <div className="text-center mb-10">
@@ -1081,19 +1124,19 @@ export default function PipelinePage({ pipeline, title, subtitle }: PipelinePage
                     ))}
                   </div>
                 )}
-                <div className="rounded-xl border border-yellow-300 bg-yellow-100 px-4 py-3">
-                  <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-yellow-900">
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                  <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-gray-600">
                     <Lightbulb className="w-3.5 h-3.5" />
-                    <span>说明</span>
+                    <span>怎么生成的</span>
                   </div>
-                  <p className="text-sm leading-6 text-yellow-950">
+                  <p className="text-sm leading-6 text-gray-500">
                     {templateMode
                       ? templateMediaKind === 'video'
-                        ? '精品模版会先按模版媒体位生成图片，再调用视频模型生成动态媒体，最后逐帧渲染 HTML 模版并合成 TTS 音频。'
-                        : '精品模版会按模版媒体位生成图片，再用 HTML 模版精确排版标题、字幕和自定义字段。'
+                        ? '按模版的版式先画图，再把图做成动态视频，最后套上模版的标题和字幕，并配上 AI 朗读的旁白。'
+                        : '按模版的版式画图，再自动排好标题、字幕和署名等文字。'
                       : standardVideoMode === 'image_concat'
-                      ? '图片拼接会为每个旁白片段生成一张图片，并配合 TTS 音频合成为静态图文短视频。等待时间主要取决于图片生成速度，通常生成每张图片需 10-20 秒。'
-                      : '动态视频会先为每个旁白片段生成图片，再调用视频模型把图片扩展为动态片段，最后合成为完整短片。等待时间更长，通常生成每个视频片段需 1-2 分钟。'}
+                      ? '每句旁白配一张图，再配上 AI 朗读的声音，合成图文短视频。每张图大约 10-20 秒。'
+                      : '每句旁白先配一张图，再让图动起来，最后拼成完整短片。等得更久，每个片段大约 1-2 分钟。'}
                   </p>
                 </div>
                 <div className="grid grid-cols-2 h-10 rounded-lg bg-gray-100 p-1 text-sm max-w-sm">
@@ -1113,11 +1156,11 @@ export default function PipelinePage({ pipeline, title, subtitle }: PipelinePage
                 <textarea
                   value={text}
                   onChange={e => setText(e.target.value)}
-                  placeholder={standardMode === 'inspiration' ? '输入主题、观点或故事灵感，系统会先构思成完整旁白...' : '输入完整旁白文案，系统会按句号切分片段并直接进入 TTS...'}
+                  placeholder={standardMode === 'inspiration' ? '输入主题、观点或故事灵感，系统会先构思成完整旁白...' : '粘贴完整旁白文案，系统会按句号切成几段，直接用 AI 朗读...'}
                   className="w-full min-h-[150px] resize-none rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm text-gray-800 outline-none focus:border-neutral-300"
                 />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <TextInput label="标题" value={titleValue} onChange={setTitleValue} placeholder="可选，留空时由llm生成" />
+                  <TextInput label="标题" value={titleValue} onChange={setTitleValue} placeholder="可不填，AI 会自动起" />
                   {standardMode === 'inspiration' && (
                     <NumberField label="片段数量" value={standardSegmentCount} onChange={setStandardSegmentCount} min={1} max={20} />
                   )}
@@ -1154,8 +1197,8 @@ export default function PipelinePage({ pipeline, title, subtitle }: PipelinePage
                   className="w-full min-h-[130px] resize-none rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm text-gray-800 outline-none focus:border-neutral-300"
                 />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <MediaUploadField label="参考图片" value={imagePath} onChange={setImagePath} accept="image/*" placeholder="/path/to/image.png" required />
-                  <MediaUploadField label="动作视频" value={videoPath} onChange={setVideoPath} accept="video/*" placeholder="/path/to/video.mp4" required />
+                  <MediaUploadField label="参考图片" value={imagePath} onChange={setImagePath} accept="image/*" placeholder="点击上传，或粘贴图片地址" required />
+                  <MediaUploadField label="动作视频" value={videoPath} onChange={setVideoPath} accept="video/*" placeholder="点击上传，或粘贴视频地址" required />
                 </div>
               </div>
             )}
@@ -1163,10 +1206,10 @@ export default function PipelinePage({ pipeline, title, subtitle }: PipelinePage
             {pipeline === 'digital_human' && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <MediaUploadField label="人物图片" value={characterImage} onChange={setCharacterImage} accept="image/*" placeholder="/path/to/person.png" required />
-                  <MediaUploadField label="商品图片" value={goodsImage} onChange={setGoodsImage} accept="image/*" placeholder="/path/to/product.png" />
+                  <MediaUploadField label="人物图片" value={characterImage} onChange={setCharacterImage} accept="image/*" placeholder="点击上传人物照片" required />
+                  <MediaUploadField label="商品图片" value={goodsImage} onChange={setGoodsImage} accept="image/*" placeholder="可选，点击上传商品图" />
                 </div>
-                <TextInput label="商品标题" value={goodsTitle} onChange={setGoodsTitle} placeholder="可选，留空时由llm生成" />
+                <TextInput label="商品标题" value={goodsTitle} onChange={setGoodsTitle} placeholder="可不填，AI 会自动起" />
                 <textarea
                   value={goodsText}
                   onChange={e => setGoodsText(e.target.value)}
@@ -1241,7 +1284,7 @@ export default function PipelinePage({ pipeline, title, subtitle }: PipelinePage
               <div className="mt-4 p-4 bg-gray-50 rounded-xl space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {(pipeline === 'digital_human' || pipeline === 'standard') && (
-                    <SelectField label="LLM 模型" value={llmModel} onChange={setLlmModel} groups={llmModelGroups} />
+                    <SelectField label="文字模型" value={llmModel} onChange={setLlmModel} groups={llmModelGroups} />
                   )}
                   {pipeline !== 'action_transfer' && (
                     <SelectField label="图片模型" value={imageModel} onChange={setImageModel} groups={imageModelGroups} />
@@ -1266,17 +1309,17 @@ export default function PipelinePage({ pipeline, title, subtitle }: PipelinePage
                   )}
                   {pipeline !== 'action_transfer' && (
                     <>
-                      <SelectField label="TTS 声音" value={ttsVoice} onChange={setTtsVoice} groups={TTS_VOICE_GROUPS} />
-                      <NumberField label="TTS 速度" value={ttsSpeed} onChange={setTtsSpeed} min={0.5} max={2} />
+                      <SelectField label="朗读声音" value={ttsVoice} onChange={setTtsVoice} groups={TTS_VOICE_GROUPS} />
+                      <NumberField label="朗读语速" value={ttsSpeed} onChange={setTtsSpeed} min={0.5} max={2} />
                     </>
                   )}
                 </div>
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium text-gray-500">{pipeline === 'standard' ? '风格控制' : '负向提示词'}</span>
+                  <span className="text-xs font-medium text-gray-500">{pipeline === 'standard' ? '画面风格' : '不想出现的内容'}</span>
                   <textarea
                     value={negativePrompt}
                     onChange={e => setNegativePrompt(e.target.value)}
-                    placeholder={pipeline === 'standard' ? '会作为所有图像提示词的前缀...' : '负向提示词...'}
+                    placeholder={pipeline === 'standard' ? '描述想要的画面风格，会用在每一张图上，也可以点下方预设...' : '例如：模糊、变形、多余的手指...'}
                     className="w-full min-h-[70px] resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-neutral-300"
                   />
                 </label>

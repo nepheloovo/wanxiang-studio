@@ -55,10 +55,10 @@ interface Tool {
 }
 
 const tools: Tool[] = [
-  { id: 'llm', name: 'LLM 对话', description: '文字生成', icon: <MessageSquare className="w-5 h-5" /> },
+  { id: 'llm', name: 'AI 对话', description: '写文案、问问题', icon: <MessageSquare className="w-5 h-5" /> },
   { id: 'vlm', name: '图片理解', description: '分析图片内容', icon: <Image className="w-5 h-5" /> },
   { id: 't2i', name: '文生图', description: '文字生成图片', icon: <Sparkles className="w-5 h-5" /> },
-  { id: 'i2i', name: '图生图', description: '图片风格转换', icon: <Zap className="w-5 h-5" /> },
+  { id: 'i2i', name: '图生图', description: '改图、换风格', icon: <Zap className="w-5 h-5" /> },
   { id: 'video', name: '视频生成', description: '图生视频/文生视频', icon: <Video className="w-5 h-5" /> },
 ];
 
@@ -334,6 +334,13 @@ export default function SandboxPage() {
   };
 
   const [selectedModel, setSelectedModel] = useState('');
+  // 设置页里配置的默认模型：工具箱默认选它，避免默认选到没填 Key 的服务
+  const [configuredModels, setConfiguredModels] = useState<Partial<Record<ToolType, string>>>({});
+  const preferredModel = (tool: ToolType, groups: Record<ToolType, ProviderGroup[]> = modelGroups) => {
+    const wanted = configuredModels[tool];
+    if (wanted && groups[tool]?.some(group => group.models.some(model => model.id === wanted))) return wanted;
+    return firstModelId(groups[tool]);
+  };
   const [webSearch, setWebSearch] = useState(false);
 
   // 获取历史记录
@@ -356,17 +363,31 @@ export default function SandboxPage() {
   useEffect(() => {
     let cancelled = false;
     Promise.all([
+      fetch('/api/config').then(resp => (resp.ok ? resp.json() : null)).catch(() => null),
       fetchModelGroupsByType('llm'),
       fetchModelGroupsByType('vlm'),
       fetchModelGroupsByType('t2i'),
       fetchModelGroupsByType('i2i'),
       fetchModelGroupsByType('video'),
     ])
-      .then(([llm, vlm, t2i, i2i, video]) => {
+      .then(([configData, llm, vlm, t2i, i2i, video]) => {
         if (cancelled) return;
         const groups = { llm, vlm, t2i, i2i, video };
+        const models = configData?.config?.models || {};
+        const configured: Partial<Record<ToolType, string>> = {
+          llm: models.llm,
+          vlm: models.vlm,
+          t2i: models.image_t2i,
+          i2i: models.image_it2i,
+          video: models.video_first_frame || models.video,
+        };
+        setConfiguredModels(configured);
         setModelGroups(groups);
-        setSelectedModel(current => current || firstModelId(groups[activeTool]));
+        const wanted = configured[activeTool];
+        const fallback = wanted && groups[activeTool]?.some(group => group.models.some(model => model.id === wanted))
+          ? wanted
+          : firstModelId(groups[activeTool]);
+        setSelectedModel(current => current || fallback);
       })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -458,7 +479,7 @@ export default function SandboxPage() {
   // 工具切换时重置模型选择
   const handleToolChange = (tool: ToolType) => {
     setActiveTool(tool);
-    setSelectedModel(firstModelId(modelGroups[tool]));
+    setSelectedModel(preferredModel(tool));
     setResult(null);
     setCurrentOutput(null);
     setError(null);
@@ -471,7 +492,7 @@ export default function SandboxPage() {
     // 只有当前模型不在新工具的模型列表中时才更新
     const currentInList = models.some(m => m.id === selectedModel);
     if (!currentInList) {
-      setSelectedModel(models.find(m => m.default)?.id || models[0]?.id || '');
+      setSelectedModel(preferredModel(activeTool) || models.find(m => m.default)?.id || models[0]?.id || '');
     }
   }, [activeTool, modelGroups, selectedModel]);
 
@@ -592,16 +613,16 @@ export default function SandboxPage() {
 
   return (
     <div className="min-h-screen bg-gray-50/50">
-      <BrandHeader />
+      <BrandHeader title="AI 工具箱" />
 
       <main className="max-w-5xl mx-auto px-6 py-8">
         <>
             <div className="mb-8 text-center">
               <div className="inline-flex items-center gap-2 mb-3">
                 <Hexagon className="w-7 h-7 text-neutral-900" />
-                <h1 className="text-2xl font-bold text-gray-800">临时工作台</h1>
+                <h1 className="text-2xl font-bold text-gray-800">AI 工具箱</h1>
               </div>
-              <p className="text-sm text-gray-500">独立调用各种 AI 工具</p>
+              <p className="text-sm text-gray-500">单独试用某一项 AI 能力：聊天写文案、看图、画图、改图、做视频</p>
             </div>
 
             {/* 工具选择 */}

@@ -7,7 +7,7 @@ export default function StandardPipelinePage() {
       <PipelinePage
         pipeline="standard"
         title="文艺短视频"
-        subtitle="输入创作灵感或完整文案，生成图片拼接或动态视频短片"
+        subtitle="写一个主题或一段文案，AI 自动配图、配音，生成短视频"
       />
     </Suspense>
   );

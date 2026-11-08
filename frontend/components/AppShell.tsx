@@ -9,13 +9,28 @@ import { clearTempCache, fetchPipelineTasks, fetchSandboxTasks, fetchScenarios, 
 import { sessionReviewState, stageLabel, type StageNameMap } from '@/lib/sessionState';
 import { brand } from '@/config/brand';
 
-const NAV_ITEMS = [
-  { href: '/', label: brand.name, icon: Home },
-  { href: '/projects', label: '我的作品', icon: FolderOpen },
-  { href: '/sandbox', label: '临时工作台', icon: Hexagon },
-  { href: '/pipelines/standard', label: '文艺短视频', icon: Clapperboard },
-  { href: '/pipelines/action-transfer', label: '动作迁移', icon: Repeat2 },
-  { href: '/pipelines/digital-human', label: '数字人口播', icon: UserRound },
+/** 导航分组：主线（开始创作 / 我的作品）在前，快捷工具和单项工具在后 */
+const NAV_SECTIONS: Array<{ title?: string; items: Array<{ href: string; label: string; icon: typeof Home }> }> = [
+  {
+    items: [
+      { href: '/', label: '开始创作', icon: Home },
+      { href: '/projects', label: '我的作品', icon: FolderOpen },
+    ],
+  },
+  {
+    title: '一键快捷工具',
+    items: [
+      { href: '/pipelines/standard', label: '文艺短视频', icon: Clapperboard },
+      { href: '/pipelines/digital-human', label: '数字人口播', icon: UserRound },
+      { href: '/pipelines/action-transfer', label: '动作迁移', icon: Repeat2 },
+    ],
+  },
+  {
+    title: '单项能力',
+    items: [
+      { href: '/sandbox', label: 'AI 工具箱', icon: Hexagon },
+    ],
+  },
 ];
 
 const SETTINGS_ITEM = { href: '/settings', label: '设置', icon: Settings };
@@ -125,8 +140,8 @@ function pipelineCompletedTaskItem(task: PipelineTask): RunningTaskItem | null {
 }
 
 const SANDBOX_TOOL_LABELS: Record<string, string> = {
-  llm: 'LLM',
-  vlm: 'VLM',
+  llm: 'AI 对话',
+  vlm: '图片理解',
   t2i: '文生图',
   i2i: '图生图',
   video: '视频生成',
@@ -138,7 +153,7 @@ function sandboxTaskItem(task: SandboxTask): RunningTaskItem {
     id: `sandbox-${task.id}`,
     href: `/sandbox?task=${encodeURIComponent(task.id)}`,
     title: input.prompt || input.reference_image || task.id,
-    scope: `临时工作台 · ${SANDBOX_TOOL_LABELS[task.tool] || task.tool}`,
+    scope: `AI 工具箱 · ${SANDBOX_TOOL_LABELS[task.tool] || task.tool}`,
     status: task.status || 'running',
     progress: task.progress || 1,
   };
@@ -191,13 +206,13 @@ function TaskPanel({
   onTaskClick: (task: RunningTaskItem) => void;
 }) {
   return (
-    <section className="sfa-task-panel h-[20vh] min-h-32 border-t border-gray-100 p-3">
+    <section className={clsx('sfa-task-panel border-t border-gray-100 p-3', tasks.length ? 'sfa-task-panel-filled h-[20vh] min-h-32' : 'sfa-task-panel-empty')}>
       <div className="mb-2 flex items-center gap-2 px-1">
         {icon}
         <span className="text-xs font-medium text-gray-500">{title}</span>
         {loading && <Loader2 className="ml-auto h-3 w-3 animate-spin text-gray-300" />}
       </div>
-      <div className="h-[calc(100%-26px)] overflow-y-auto pr-1">
+      <div className={clsx('overflow-y-auto pr-1', tasks.length && 'h-[calc(100%-26px)]')}>
         {tasks.length ? (
           <div className="space-y-1.5">
             {tasks.map(task => {
@@ -231,7 +246,7 @@ function TaskPanel({
             })}
           </div>
         ) : (
-          <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-gray-100 px-2 text-center text-xs text-gray-300">
+          <div className="sfa-task-empty px-1 text-xs text-gray-300">
             {emptyText}
           </div>
         )}
@@ -314,7 +329,7 @@ function SidebarTaskPanels({ currentPath }: { currentPath: string }) {
         loading={loading}
         tasks={runningTasks}
         currentPath={currentPath}
-        emptyText="还没有进行中的任务"
+        emptyText="暂无"
         onTaskClick={handleRunningClick}
       />
       <TaskPanel
@@ -392,26 +407,35 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <span className="text-base font-semibold text-gray-900 truncate">{brand.name}</span>
             </div>
           </div>
-          <nav className="sfa-sidebar-nav min-h-0 flex-1 overflow-y-auto p-3 space-y-1">
-            {NAV_ITEMS.map(item => {
-              const Icon = item.icon;
-              const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={clsx(
-                    'sfa-sidebar-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
-                    active
-                      ? 'bg-cream/5 text-neutral-900'
-                      : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
-                  )}
-                >
-                  <Icon className="w-4 h-4 flex-shrink-0" />
-                  <span className="truncate">{item.label}</span>
-                </Link>
-              );
-            })}
+          <nav className="sfa-sidebar-nav min-h-0 flex-1 overflow-y-auto p-3">
+            {NAV_SECTIONS.map((section, sectionIndex) => (
+              <div key={section.title || sectionIndex} className={clsx(sectionIndex > 0 && 'pt-3')}>
+                {section.title && (
+                  <div className="px-3 pb-1 text-[11px] font-medium text-gray-400">{section.title}</div>
+                )}
+                <div className="space-y-1">
+                  {section.items.map(item => {
+                    const Icon = item.icon;
+                    const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={clsx(
+                          'sfa-sidebar-link flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
+                          active
+                            ? 'bg-cream/5 text-neutral-900'
+                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
+                        )}
+                      >
+                        <Icon className="w-4 h-4 flex-shrink-0" />
+                        <span className="truncate">{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </nav>
           <SidebarTaskPanels currentPath={pathname} />
           <div className="sfa-sidebar-footer relative border-t border-gray-100 p-3">

@@ -4,6 +4,8 @@ const backendApiUrl = (process.env.BACKEND_API_URL || 'http://127.0.0.1:8000').r
 
 const nextConfig: NextConfig = {
   agentRules: false,
+  // 关闭开发模式左下角的 Next.js 角标（会盖住侧栏的「设置」）
+  devIndicators: false,
   async rewrites() {
     return [
       {

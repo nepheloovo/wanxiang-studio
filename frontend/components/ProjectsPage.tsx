@@ -118,7 +118,7 @@ export default function ProjectsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <BrandHeader />
+      <BrandHeader title="我的作品" />
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
         <div className="mb-6 flex items-end justify-between gap-4">
           <div>
