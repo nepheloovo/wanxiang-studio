@@ -518,7 +518,7 @@ export default function VideoStage({ stage, state, sessionId, onConfirm, onInter
           <h2 className="text-lg font-semibold text-gray-800">{stage?.name || '视频生成'}</h2>
         </div>
         <p className="text-sm text-gray-500 mb-4">
-          将场景参考图转化为视频片段，支持逐项重新生成
+          把选好的画面变成动起来的视频片段，不满意的片段可以单独重新生成。
         </p>
 
         {/* 运行中 */}

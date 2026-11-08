@@ -39,7 +39,7 @@ export default function PostProductionStage({ stage, state, onConfirm, onRegener
     <div className="flex flex-col h-full">
       <div className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6">
         <h2 className="text-lg font-semibold text-gray-800 mb-1">{stage?.name || '后期剪辑'}</h2>
-        <p className="text-sm text-gray-500 mb-6">按剧集拼接视频，生成各集独立成片</p>
+        <p className="text-sm text-gray-500 mb-6">把视频片段按顺序拼接起来，每集得到一条完整成片。</p>
 
         {/* 运行中 */}
         {state.status === 'running' && (

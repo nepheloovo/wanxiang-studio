@@ -1,0 +1,12 @@
+[Current script]
+{script_text}
+
+[User's revision request]
+{feedback}
+
+Rewrite the script above according to the user's request, following these hard rules:
+1. Output only the full revised script text. No explanations, no Markdown code fences.
+2. Keep everything the user did not ask to change as close to the original as possible; keep exactly {episodes} episodes.
+3. Keep exactly the same format as the current script: each episode starts with `## Episode N`; scene headings, the characters line, `<action>` lines and `Name (emotion): line` dialogue lines stay in the same style.
+4. Each episode body has {min_lines}-{max_lines} action or dialogue lines and never more than {max_lines}; headings and the characters line do not count.
+5. Each action is at most 20 words; never describe unfilmable inner thoughts, never convey information through on-screen text.

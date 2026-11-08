@@ -93,6 +93,7 @@ models:
     provider: dashscope
     family: qwen
     type:
+    - llm
     - vlm
     concurrency: 10
     price_per_1k_input_token: 0.0008

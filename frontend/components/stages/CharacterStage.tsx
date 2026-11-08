@@ -476,7 +476,7 @@ export default function CharacterStage({ stage, state, sessionId, onConfirm, onI
           <h2 className="text-lg font-semibold text-gray-800">{stage?.name || '角色 / 场景设计'}</h2>
         </div>
         <p className="text-sm text-gray-500 mb-6">
-          生成角色4视图 (正面特写·正面全身·侧面全身·背面全身) 和场景全景图
+          为每个角色画出正面、侧面、背面造型，并为每个场景画一张全景图，后面的画面都以它们为准。
         </p>
 
         {/* 运行中 */}

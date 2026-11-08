@@ -181,6 +181,13 @@ function maskSecret(value: unknown) {
   return `${text.slice(0, 5)}${'*'.repeat(Math.min(12, text.length - 10))}${text.slice(-5)}`;
 }
 
+function selectHasValue(options: unknown, value: string): boolean {
+  if (!Array.isArray(options)) return false;
+  return options.some((item: any) => (Array.isArray(item?.models)
+    ? item.models.some((model: any) => model.id === value)
+    : String(item?.value ?? item) === value));
+}
+
 function isProviderOptions(options: Field['options']): options is ProviderGroup[] {
   return Array.isArray(options) && options.some(option => 'models' in option);
 }
@@ -340,6 +347,9 @@ export default function SettingsPage() {
                             onChange={event => updateField(field, event.target.value)}
                             className="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-neutral-300"
                           >
+                            {value !== undefined && value !== null && String(value) !== '' && !selectHasValue(field.options, String(value)) && (
+                              <option value={String(value)}>{String(value)}（当前配置）</option>
+                            )}
                             {isProviderOptions(field.options) ? (
                               field.options.map(group => (
                                 <optgroup key={group.provider} label={group.label}>

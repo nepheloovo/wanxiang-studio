@@ -74,6 +74,9 @@ function ProviderSelect({
       onChange={e => onChange(e.target.value)}
       className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-700 outline-none w-full"
     >
+      {value && !providers.some(pg => pg.models.some(m => m.id === value)) && (
+        <option value={value}>{value}（当前配置）</option>
+      )}
       {providers.map(pg => (
         <optgroup key={pg.provider} label={pg.label}>
           {pg.models.map(m => (
@@ -197,19 +200,19 @@ function ModelSelector({
       {open && (
         <div className="absolute right-0 top-full mt-1 w-72 bg-white rounded-xl shadow-lg border border-gray-200 p-3 z-50 space-y-2.5">
           <label className="flex flex-col gap-1">
-            <span className="text-[10px] text-gray-400 font-medium">LLM 模型</span>
+            <span className="text-[10px] text-gray-400 font-medium">写剧本、分镜用的模型</span>
             <ProviderSelect value={config.llm_model} providers={llmProviders} onChange={v => update('llm_model', v)} />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-[10px] text-gray-400 font-medium">VLM 评估模型</span>
+            <span className="text-[10px] text-gray-400 font-medium">检查画面用的模型</span>
             <ProviderSelect value={config.vlm_model} providers={vlmProviders} onChange={v => update('vlm_model', v)} />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-[10px] text-gray-400 font-medium">文生图</span>
+            <span className="text-[10px] text-gray-400 font-medium">画图模型</span>
             <ProviderSelect value={config.image_t2i_model} providers={t2iProviders} onChange={v => update('image_t2i_model', v)} />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-[10px] text-gray-400 font-medium">图生图</span>
+            <span className="text-[10px] text-gray-400 font-medium">改图模型</span>
             <ProviderSelect value={config.image_it2i_model} providers={i2iProviders} onChange={v => update('image_it2i_model', v)} />
           </label>
           {showVideoModels && (<>
@@ -412,10 +415,10 @@ export default function TopBar({
                 ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
                 : 'text-gray-500 hover:bg-gray-50'
             )}
-            title={autoMode ? '代理模式：自动执行全流程' : '手动模式：每阶段需确认'}
+            title={autoMode ? '现在：全自动，每步做完直接进入下一步。点击切换为每步确认' : '现在：每步做完停下来等你确认。点击切换为全自动'}
           >
             <Zap className="w-3.5 h-3.5" />
-            <span>{autoMode ? '自动' : '手动'}</span>
+            <span>{autoMode ? '全自动' : '每步确认'}</span>
           </button>
         )}
 
@@ -431,19 +434,22 @@ export default function TopBar({
           </button>
         )}
 
-        {/* 项目状态 */}
-        {hasSession && projectStatus && (
+        {/* 项目状态：只完成了部分步骤时不显示"已完成"，避免误以为整个作品做完了 */}
+        {hasSession && projectStatus && (() => {
+          const allStagesDone = stages.length > 0 && stages.every(st => stageStatuses[st.id] === 'completed');
+          const partial = projectStatus === 'completed' && !allStagesDone;
+          return (
           <div
             className={clsx(
               'px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1',
               projectStatus === 'running' && 'bg-cream/5 text-neutral-900',
               projectStatus === 'waiting' && 'bg-amber-50 text-amber-700',
-              projectStatus === 'completed' && 'bg-green-50 text-green-700',
+              projectStatus === 'completed' && (partial ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'),
               projectStatus === 'pending' && 'bg-gray-50 text-gray-600',
               projectStatus === 'error' && 'bg-red-50 text-red-700',
               projectStatus === 'stopped' && 'bg-orange-50 text-orange-700'
             )}
-            title="项目状态"
+            title={partial ? '这一步已完成，点「确认并继续」进入下一步' : '项目状态'}
           >
             {projectStatus === 'running' && <Loader className="w-3 h-3 animate-spin" />}
             {projectStatus === 'waiting' && <Edit3 className="w-3 h-3" />}
@@ -451,13 +457,14 @@ export default function TopBar({
             <span>
               {projectStatus === 'running' ? '执行中' :
                projectStatus === 'waiting' ? '等待确认' :
-               projectStatus === 'completed' ? '已完成' :
+               projectStatus === 'completed' ? (partial ? '待继续' : '全部完成') :
                projectStatus === 'pending' ? '空闲' :
                projectStatus === 'stopped' ? '已停止' :
                projectStatus === 'error' ? '出错' : projectStatus}
             </span>
           </div>
-        )}
+          );
+        })()}
 
       </div>
     </header>

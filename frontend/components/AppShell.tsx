@@ -2,14 +2,16 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { CheckCircle2, ChevronLeft, ChevronRight, Clapperboard, Clock, Hexagon, Home, Loader2, Repeat2, Settings, Trash2, UserRound } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, Clapperboard, Clock, FolderOpen, Hexagon, Home, Loader2, Repeat2, Settings, Trash2, UserRound } from 'lucide-react';
 import clsx from 'clsx';
 import { useEffect, useState, type CSSProperties } from 'react';
-import { clearTempCache, fetchPipelineTasks, fetchSandboxTasks, fetchSessions, type PipelineTask, type SandboxTask } from '@/lib/workflowApi';
+import { clearTempCache, fetchPipelineTasks, fetchSandboxTasks, fetchScenarios, fetchSessions, type PipelineTask, type SandboxTask } from '@/lib/workflowApi';
+import { sessionReviewState, stageLabel, type StageNameMap } from '@/lib/sessionState';
 import { brand } from '@/config/brand';
 
 const NAV_ITEMS = [
   { href: '/', label: brand.name, icon: Home },
+  { href: '/projects', label: '我的作品', icon: FolderOpen },
   { href: '/sandbox', label: '临时工作台', icon: Hexagon },
   { href: '/pipelines/standard', label: '文艺短视频', icon: Clapperboard },
   { href: '/pipelines/action-transfer', label: '动作迁移', icon: Repeat2 },
@@ -65,7 +67,7 @@ function sessionStageCount(session: { stage_ids?: unknown; status?: Record<strin
   return Math.max(1, Object.keys(session?.status || {}).length);
 }
 
-function projectTaskFromSession(session: any): RunningTaskItem | null {
+function projectTaskFromSession(session: any, names: StageNameMap): RunningTaskItem | null {
   const statusMap = session.status || {};
   const values = Object.values(statusMap);
   if (!values.includes('running')) return null;
@@ -74,27 +76,25 @@ function projectTaskFromSession(session: any): RunningTaskItem | null {
   return {
     id: `project-${session.id}`,
     href: `/?session=${encodeURIComponent(session.id)}`,
-    title: session.idea || session.id,
-    scope: runningStage ? `主流程 · ${runningStage}` : '主流程',
+    title: session.title || session.idea || session.id,
+    scope: runningStage ? `正在生成 · ${stageLabel(runningStage, session, names)}` : '正在生成',
     status: 'running',
     progress: Math.round((completed / sessionStageCount(session)) * 100),
   };
 }
 
-function projectReviewTaskFromSession(session: any): RunningTaskItem | null {
-  const statusMap = session.status || {};
-  const waitingStage = Object.keys(statusMap).find(key => statusMap[key] === 'waiting');
-  const completed = Object.values(statusMap).filter(value => ['completed', 'session_completed'].includes(String(value))).length;
-  const allDone = completed >= sessionStageCount(session) || statusMap.completed === 'completed';
-  if (!waitingStage && !allDone) return null;
-  const targetStage = waitingStage || Object.keys(statusMap).reverse().find(key => ['completed', 'session_completed'].includes(String(statusMap[key]))) || '';
+function projectReviewTaskFromSession(session: any, names: StageNameMap): RunningTaskItem | null {
+  const review = sessionReviewState(session);
+  if (!review) return null;
+  const completed = Object.values(session.status || {}).filter(value => ['completed', 'session_completed'].includes(String(value))).length;
+  const waiting = review.kind === 'waiting';
   return {
-    id: `project-review-${session.id}-${waitingStage || 'completed'}`,
-    href: `/?session=${encodeURIComponent(session.id)}${targetStage ? `&stage=${encodeURIComponent(targetStage)}` : ''}`,
-    title: session.idea || session.title || session.id,
-    scope: waitingStage ? `主流程 · ${waitingStage}` : '主流程',
-    status: waitingStage ? 'waiting' : 'completed',
-    progress: waitingStage ? Math.round((completed / sessionStageCount(session)) * 100) : 100,
+    id: `project-review-${session.id}-${waiting ? review.stage : 'completed'}`,
+    href: `/?session=${encodeURIComponent(session.id)}${review.stage ? `&stage=${encodeURIComponent(review.stage)}` : ''}`,
+    title: session.title || session.idea || session.id,
+    scope: waiting ? `待确认 · ${stageLabel(review.stage, session, names)}` : '全部完成',
+    status: waiting ? 'waiting' : 'completed',
+    progress: waiting ? Math.round((completed / sessionStageCount(session)) * 100) : 100,
   };
 }
 
@@ -162,8 +162,10 @@ function saveDismissedCompletedTasks(ids: Set<string>) {
 
 function loadSidebarOpen(): boolean {
   if (typeof window === 'undefined') return true;
+  // 窄屏（平板 / 手机）侧栏会盖住内容，进入页面时一律收起
+  if (window.innerWidth < 1104) return false;
   const stored = window.localStorage.getItem(SIDEBAR_OPEN_KEY);
-  return stored === null ? window.innerWidth >= 1104 : stored === 'true';
+  return stored === null ? true : stored === 'true';
 }
 
 function saveSidebarOpen(open: boolean) {
@@ -244,6 +246,20 @@ function SidebarTaskPanels({ currentPath }: { currentPath: string }) {
   const [completedTasks, setCompletedTasks] = useState<RunningTaskItem[]>([]);
   const [dismissedCompleted, setDismissedCompleted] = useState<Set<string>>(() => loadDismissedCompletedTasks());
   const [loading, setLoading] = useState(false);
+  const [stageNames, setStageNames] = useState<StageNameMap>({});
+
+  useEffect(() => {
+    fetchScenarios()
+      .then(list => {
+        const map: StageNameMap = {};
+        list.scenarios.forEach((scenario: any) => (scenario.stages || []).forEach((stage: any) => {
+          map[`${scenario.id}:${stage.id}`] = stage.short_name || stage.name;
+          if (!map[stage.id]) map[stage.id] = stage.short_name || stage.name;
+        }));
+        setStageNames(map);
+      })
+      .catch(() => {});
+  }, []);
 
   const load = async () => {
     setLoading(true);
@@ -256,12 +272,12 @@ function SidebarTaskPanels({ currentPath }: { currentPath: string }) {
       setRunningTasks([
         ...sandboxRecords.map(sandboxTaskItem),
         ...pipelineRecords.map(pipelineTaskItem).filter((task): task is RunningTaskItem => Boolean(task)),
-        ...sessions.map(projectTaskFromSession).filter((task): task is RunningTaskItem => Boolean(task)),
+        ...sessions.map(session => projectTaskFromSession(session, stageNames)).filter((task): task is RunningTaskItem => Boolean(task)),
       ]);
       setCompletedTasks([
         ...pipelineRecords.map(pipelineCompletedTaskItem).filter((task): task is RunningTaskItem => Boolean(task)),
-        ...sessions.map(projectReviewTaskFromSession).filter((task): task is RunningTaskItem => Boolean(task)),
-      ].filter(task => !dismissedCompleted.has(task.id)));
+        ...sessions.map(session => projectReviewTaskFromSession(session, stageNames)).filter((task): task is RunningTaskItem => Boolean(task)),
+      ].filter(task => task.status === 'waiting' || !dismissedCompleted.has(task.id)));
     } finally {
       setLoading(false);
     }
@@ -271,13 +287,17 @@ function SidebarTaskPanels({ currentPath }: { currentPath: string }) {
     load().catch(() => {});
     const timer = window.setInterval(() => load().catch(() => {}), 3000);
     return () => window.clearInterval(timer);
-  }, [dismissedCompleted]);
+  }, [dismissedCompleted, stageNames]);
 
   const handleRunningClick = (task: RunningTaskItem) => {
     router.push(task.href);
   };
 
   const handleCompletedClick = (task: RunningTaskItem) => {
+    if (task.status === 'waiting') {
+      router.push(task.href);
+      return;
+    }
     const next = new Set(dismissedCompleted);
     next.add(task.id);
     saveDismissedCompletedTasks(next);
@@ -298,11 +318,11 @@ function SidebarTaskPanels({ currentPath }: { currentPath: string }) {
         onTaskClick={handleRunningClick}
       />
       <TaskPanel
-        title="已完成/等待确认"
+        title="待你确认 / 刚完成"
         icon={<CheckCircle2 className="h-3.5 w-3.5 text-gray-400" />}
         tasks={completedTasks}
         currentPath={currentPath}
-        emptyText="还没有已完成或待确认的任务"
+        emptyText="暂无。全部项目在「我的作品」"
         onTaskClick={handleCompletedClick}
       />
     </>
@@ -320,10 +340,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     setOpen(loadSidebarOpen());
   }, []);
 
+  const isNarrow = () => typeof window !== 'undefined' && window.innerWidth < 1104;
+
   const setSidebarOpen = (nextOpen: boolean) => {
     setOpen(nextOpen);
-    saveSidebarOpen(nextOpen);
+    // 窄屏上的开关不记住，避免回到电脑上时状态错乱
+    if (!isNarrow()) saveSidebarOpen(nextOpen);
   };
+
+  // 窄屏上点了导航就自动收起侧栏
+  useEffect(() => {
+    if (isNarrow()) setOpen(false);
+  }, [pathname]);
 
   const handleClearCache = async () => {
     setClearingCache(true);
@@ -343,7 +371,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       className="sfa-shell min-h-screen bg-gray-50 text-gray-800"
       style={{ '--app-sidebar-width': open ? '15.5rem' : '0px' } as CSSProperties}
     >
+      {open && (
+        <div
+          className="sfa-sidebar-scrim fixed inset-0 z-30 bg-black/50 min-[1104px]:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
       <aside
+        data-open={open ? 'true' : 'false'}
         className={clsx(
           'sfa-sidebar fixed inset-y-0 left-0 z-40 border-r border-gray-200 bg-white shadow-sm transition-all duration-300',
           !open && 'border-r-0'

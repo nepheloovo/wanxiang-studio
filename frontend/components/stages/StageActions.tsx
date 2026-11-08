@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { CheckCircle, Edit3, Save, RefreshCw, Check, Loader2, Play } from 'lucide-react';
+import { CheckCircle, Edit3, Save, RefreshCw, Check, Loader2, Play, Sparkles } from 'lucide-react';
 import type { StageStatus } from './types';
 
 // 按阶段类型（内置阶段 type 与 id 相同；自定义阶段为 "custom"）决定按钮行为。
@@ -30,6 +30,12 @@ interface StageActionsProps {
   /** 是否显示"确认并继续"按钮（后续阶段已执行过时隐藏） */
   showConfirm?: boolean;
   isRunning: boolean;
+  /** 编辑中：取消编辑 */
+  onCancelEdit?: () => void;
+  /** 用一句话让 AI 修改当前结果（提供时显示输入框） */
+  onAiRevise?: (feedback: string) => void | Promise<void>;
+  /** 输入框占位提示 */
+  aiRevisePlaceholder?: string;
 }
 
 export default function StageActions({
@@ -44,9 +50,13 @@ export default function StageActions({
   hasPendingItems = true,
   hasNextStageStarted = false,
   showConfirm = true,
-  isRunning
+  isRunning,
+  onAiRevise,
+  onCancelEdit,
+  aiRevisePlaceholder = '不满意？告诉 AI 怎么改，例如：结局温暖一点、少一个配角',
 }: StageActionsProps) {
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [feedback, setFeedback] = useState('');
 
   const type = stageType || stageId;
   // 是否是"继续生成"阶段（角色、分镜、参考图、视频）
@@ -85,17 +95,55 @@ export default function StageActions({
     }
   }, [onSaveSelections, saveState]);
 
+  const handleRegenerateClick = () => {
+    if (!onRegenerate) return;
+    // 整体重新生成会替换当前结果，先确认；"继续生成"只补缺项，不需要确认
+    if (!isContinueStage && !window.confirm('重新生成会用全新的结果替换现在这一版，确定吗？\n只想改一部分的话，可以用下方的「让 AI 改」或「修改」。')) return;
+    onRegenerate();
+  };
+
+  const showAiRevise = !!onAiRevise && !isRunning && (status === 'waiting' || status === 'completed' || status === 'stopped');
+  const submitFeedback = () => {
+    const text = feedback.trim();
+    if (!text || !onAiRevise) return;
+    setFeedback('');
+    void onAiRevise(text);
+  };
+
   if (!showRegen && !showActions && !showSaveSelections) return null;
 
   return (
-    <div className="border-t border-gray-200 bg-white px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
+    <div className="border-t border-gray-200 bg-white flex-shrink-0">
+    {showAiRevise && (
+      <div className="px-4 sm:px-6 pt-4">
+        <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-1.5 focus-within:border-cream/25">
+          <Sparkles className="h-4 w-4 flex-shrink-0 text-gray-400" />
+          <input
+            value={feedback}
+            onChange={event => setFeedback(event.target.value)}
+            onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) submitFeedback(); }}
+            placeholder={aiRevisePlaceholder}
+            className="min-w-0 flex-1 bg-transparent py-1.5 text-sm text-gray-800 placeholder-gray-400 outline-none"
+          />
+          <button
+            type="button"
+            onClick={submitFeedback}
+            disabled={!feedback.trim()}
+            className="flex-shrink-0 rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            让 AI 改
+          </button>
+        </div>
+      </div>
+    )}
+    <div className="px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
       {/* 左侧：重新生成/继续生成按钮 */}
       <div>
         {showRegen && (
           <button
-            onClick={onRegenerate}
+            onClick={handleRegenerateClick}
             disabled={isButtonDisabled}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-orange-300 text-orange-600 rounded-lg text-sm font-medium hover:bg-orange-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 hover:text-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title={isButtonDisabled ? (status === 'error' ? '重新尝试生成' : (isContinueStage && !hasPendingItems ? '所有项已生成完毕' : (isRegenStage && hasNextStageStarted ? '后续阶段已开始，无法重新生成' : ''))) : ''}
           >
             {isContinueStage ? <Play className="w-4 h-4" /> : <RefreshCw className="w-4 h-4" />}
@@ -117,6 +165,15 @@ export default function StageActions({
           </button>
         )}
         
+        {onCancelEdit && (
+          <button
+            onClick={onCancelEdit}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            取消
+          </button>
+        )}
+
         {showActions && onSave && (
           <button
             onClick={onSave}
@@ -124,7 +181,7 @@ export default function StageActions({
             className="flex items-center gap-2 px-4 py-2 bg-white border border-neutral-300 text-neutral-900 rounded-lg text-sm font-medium hover:bg-cream/5 transition-colors disabled:opacity-50"
           >
             <Save className="w-4 h-4" />
-            保存
+            保存修改
           </button>
         )}
 
@@ -156,6 +213,7 @@ export default function StageActions({
           </button>
         )}
       </div>
+    </div>
     </div>
   );
 }

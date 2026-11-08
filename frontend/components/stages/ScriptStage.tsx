@@ -72,6 +72,8 @@ interface ScriptData {
 }
 
 /* ─── 角色色彩 ─── */
+const ROLE_LABELS: Record<string, string> = { protagonist: '主角', supporting: '配角', background: '背景' };
+
 const ROLE_COLORS: Record<string, string> = {
   '主角': 'bg-amber-100 text-amber-700',
   'protagonist': 'bg-amber-100 text-amber-700',
@@ -199,20 +201,8 @@ export default function ScriptStage({ stage, state, onConfirm, onIntervene, onRe
         {/* 标题栏 */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
           <h2 className="text-lg font-semibold text-gray-800">{stage?.name || '剧本生成'}</h2>
-          {isEditing && (
-            <div className="flex gap-1 bg-gray-100 rounded-lg p-1 text-xs">
-              <button onClick={() => switchEditMode('structured')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${editMode === 'structured' ? 'bg-white text-neutral-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                <LayoutList className="w-3.5 h-3.5" />结构编辑
-              </button>
-              <button onClick={() => switchEditMode('raw')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${editMode === 'raw' ? 'bg-white text-neutral-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                <Code className="w-3.5 h-3.5" />JSON编辑
-              </button>
-            </div>
-          )}
         </div>
-        <p className="text-sm text-gray-500 mb-6">多轮 LLM 交互，生成结构化剧本数据</p>
+        <p className="text-sm text-gray-500 mb-6">AI 根据你的想法写出分集剧本，并整理出角色和场景。不满意可以直接修改，或告诉 AI 怎么改。</p>
 
         {/* 运行中 - 进度条 & 已选 Logline & 增量生成结果 */}
         {state.status === 'running' && (
@@ -406,7 +396,7 @@ export default function ScriptStage({ stage, state, onConfirm, onIntervene, onRe
                   {data.genre?.map((g, i) => (
                     <span key={i} className="px-2.5 py-0.5 bg-cream/5 text-neutral-900 text-xs rounded-full font-medium">{g}</span>
                   ))}
-                  {data.mood && <span className="px-2.5 py-0.5 bg-pink-50 text-pink-600 text-xs rounded-full font-medium">{data.mood}</span>}
+                  {data.mood && <span className="px-2.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full font-medium">{data.mood}</span>}
                   {data.overall_style && <span className="px-2.5 py-0.5 bg-cyan-50 text-cyan-600 text-xs rounded-full font-medium">{data.overall_style}</span>}
                 </div>
               </section>
@@ -437,7 +427,9 @@ export default function ScriptStage({ stage, state, onConfirm, onIntervene, onRe
                     <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-sm transition-shadow">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="font-medium text-gray-800">{c.name}</span>
-                        <span className={`px-1.5 py-0.5 text-[10px] rounded ${ROLE_COLORS[c.role] || 'bg-gray-100 text-gray-500'}`}>{c.role}</span>
+                        {c.role && (
+                          <span className={`px-1.5 py-0.5 text-[10px] rounded ${ROLE_COLORS[c.role] || 'bg-gray-100 text-gray-500'}`}>{ROLE_LABELS[c.role] || c.role}</span>
+                        )}
                         {c.species && c.species !== '人类' && c.species !== 'human' && (
                           <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 text-[10px] rounded">{c.species}</span>
                         )}
@@ -720,12 +712,6 @@ export default function ScriptStage({ stage, state, onConfirm, onIntervene, onRe
               </section>
             )}
 
-            <div className="flex gap-2 pt-2">
-              <button onClick={handleSave} className="flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-700 transition-colors">
-                <Save className="w-4 h-4" />保存修改</button>
-              <button onClick={cancelEdit} className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200 transition-colors">
-                <X className="w-4 h-4" />取消</button>
-            </div>
           </div>
         )}
 
@@ -756,6 +742,7 @@ export default function ScriptStage({ stage, state, onConfirm, onIntervene, onRe
           showConfirm={showConfirm}
           onEdit={startEdit}
           onRegenerate={onRegenerate}
+          onAiRevise={!hasNextStageStarted ? (text: string) => onIntervene({ action: 'revise_with_feedback', feedback: text }) : undefined}
           stageId="script_generation"
           hasPendingItems={hasPendingItems}
           hasNextStageStarted={hasNextStageStarted}
@@ -766,9 +753,9 @@ export default function ScriptStage({ stage, state, onConfirm, onIntervene, onRe
         <StageActions
           status={state.status}
           onConfirm={onConfirm}
-          showConfirm={showConfirm}
+          showConfirm={false}
           onSave={handleSave}
-          onRegenerate={onRegenerate}
+          onCancelEdit={cancelEdit}
           stageId="script_generation"
           hasPendingItems={hasPendingItems}
           hasNextStageStarted={hasNextStageStarted}

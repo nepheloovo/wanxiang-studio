@@ -16,7 +16,7 @@ defaults:
   video_ratio: "9:16"
   video_resolution: 720P
   video_generation_mode: first_frame
-  episodes: 6
+  episodes: 1           # 默认 1 集，先看效果再加
 
 ui:
   hero_title: 写下设定，开连载你的漫剧

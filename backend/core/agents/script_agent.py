@@ -365,6 +365,13 @@ class ScriptWriterAgent(AgentInterface):
             # 设置 requires_intervention=True 以触发表单确认按钮
             return {"payload": result, "requires_intervention": True, "stage_completed": False}
 
+        # 用户用一句话提修改意见：在当前剧本基础上按意见改写，再重新结构化
+        revise_feedback = ""
+        if intervention and intervention.get("action") == "revise_with_feedback":
+            revise_feedback = str(intervention.get("feedback") or "").strip()
+            if not revise_feedback:
+                raise ValueError("修改意见不能为空")
+
         async def run_logic():
             idea = input_data.get("idea", "")
             sid = input_data.get("session_id", "")
@@ -372,6 +379,10 @@ class ScriptWriterAgent(AgentInterface):
             llm_model = self._require_input(input_data, "llm_model")
             web_search = input_data.get("web_search", False)
             episodes = input_data.get("episodes")
+            existing_episodes = episodes if isinstance(episodes, list) else None
+            if existing_episodes is not None:
+                # 修改模式下 input_data["episodes"] 是当前剧本的分集列表，集数沿用它
+                episodes = len(existing_episodes) or None
             if episodes is None:
                 logger.warning("[ScriptWriter] episodes missing from input_data; falling back to 4. session=%s", sid)
                 episodes = 4
@@ -441,33 +452,56 @@ class ScriptWriterAgent(AgentInterface):
                     repaired = await _trim_script_if_needed(repaired, f"{phase}集数修复后")
                 return repaired
 
-            # 1. Generate full script
-            _log_progress(10, "正在生成完整剧本文本初稿...")
-            prompt = self._prompt("script", "generate_script", "zh" if is_zh else "en").format(idea=idea, style=style, episodes=episodes)
+            if revise_feedback:
+                # 1'. 按用户意见改写当前剧本
+                current_meta = input_data.get("meta") if isinstance(input_data.get("meta"), dict) else {}
+                current_text = current_meta.get("original_text") or "\n\n".join(
+                    str(ep.get("content", "")) for ep in (existing_episodes or []) if isinstance(ep, dict)
+                )
+                if not current_text.strip():
+                    raise ValueError("当前没有可修改的剧本")
+                _log_progress(15, "正在按你的意见修改剧本...")
+                feedback_prompt = self._prompt("script", "revise_by_feedback", "zh" if is_zh else "en").format(
+                    script_text=current_text,
+                    feedback=revise_feedback,
+                    episodes=episodes,
+                    min_lines=self.MIN_EPISODE_LINES,
+                    max_lines=self.MAX_EPISODE_LINES,
+                )
+                full_script_text = await loop.run_in_executor(None, self._cancellable_query, llm, feedback_prompt, [], llm_model, True, sid, web_search)
+                logger.info(f"[ScriptWriter] Script revised by user feedback ({len(full_script_text)} chars)")
+                full_script_text = await _trim_script_if_needed(full_script_text, "修改后")
+                full_script_text = await _repair_episode_count_if_needed(full_script_text, "修改后")
+                if not idea:
+                    idea = current_meta.get("generation_prompt", "")
+            else:
+                # 1. Generate full script
+                _log_progress(10, "正在生成完整剧本文本初稿...")
+                prompt = self._prompt("script", "generate_script", "zh" if is_zh else "en").format(idea=idea, style=style, episodes=episodes)
 
-            full_script_text = await loop.run_in_executor(None, self._cancellable_query, llm, prompt, [], llm_model, True, sid, web_search)
-            logger.info(f"[ScriptWriter] Initial script generated ({len(full_script_text)} chars)")
-            full_script_text = await _trim_script_if_needed(full_script_text, "初稿")
-            full_script_text = await _repair_episode_count_if_needed(full_script_text, "初稿")
+                full_script_text = await loop.run_in_executor(None, self._cancellable_query, llm, prompt, [], llm_model, True, sid, web_search)
+                logger.info(f"[ScriptWriter] Initial script generated ({len(full_script_text)} chars)")
+                full_script_text = await _trim_script_if_needed(full_script_text, "初稿")
+                full_script_text = await _repair_episode_count_if_needed(full_script_text, "初稿")
             
-            _log_progress(20, "正在进行台词评估...")
-            eval_dialogue_prompt = self._prompt("script", "eval_dialogue", "zh" if is_zh else "en").format(script_text=full_script_text)
-            dialogue_critique = await loop.run_in_executor(None, self._cancellable_query, llm, eval_dialogue_prompt, [], llm_model, True, sid, web_search)
+                _log_progress(20, "正在进行台词评估...")
+                eval_dialogue_prompt = self._prompt("script", "eval_dialogue", "zh" if is_zh else "en").format(script_text=full_script_text)
+                dialogue_critique = await loop.run_in_executor(None, self._cancellable_query, llm, eval_dialogue_prompt, [], llm_model, True, sid, web_search)
             
-            _log_progress(30, "正在进行情节评估...")
-            eval_plot_prompt = self._prompt("script", "eval_plot", "zh" if is_zh else "en").format(script_text=full_script_text)
-            plot_critique = await loop.run_in_executor(None, self._cancellable_query, llm, eval_plot_prompt, [], llm_model, True, sid, web_search)
+                _log_progress(30, "正在进行情节评估...")
+                eval_plot_prompt = self._prompt("script", "eval_plot", "zh" if is_zh else "en").format(script_text=full_script_text)
+                plot_critique = await loop.run_in_executor(None, self._cancellable_query, llm, eval_plot_prompt, [], llm_model, True, sid, web_search)
             
-            _log_progress(40, "正在根据评估意见优化剧本...")
-            revise_prompt = self._prompt("script", "revise_script", "zh" if is_zh else "en").format(
-                script_text=full_script_text, 
-                dialogue_critique=dialogue_critique, 
-                plot_critique=plot_critique
-            )
-            full_script_text = await loop.run_in_executor(None, self._cancellable_query, llm, revise_prompt, [], llm_model, True, sid, web_search)
-            logger.info(f"[ScriptWriter] Final script generated ({len(full_script_text)} chars)")
-            full_script_text = await _trim_script_if_needed(full_script_text, "优化后")
-            full_script_text = await _repair_episode_count_if_needed(full_script_text, "优化后")
+                _log_progress(40, "正在根据评估意见优化剧本...")
+                revise_prompt = self._prompt("script", "revise_script", "zh" if is_zh else "en").format(
+                    script_text=full_script_text, 
+                    dialogue_critique=dialogue_critique, 
+                    plot_critique=plot_critique
+                )
+                full_script_text = await loop.run_in_executor(None, self._cancellable_query, llm, revise_prompt, [], llm_model, True, sid, web_search)
+                logger.info(f"[ScriptWriter] Final script generated ({len(full_script_text)} chars)")
+                full_script_text = await _trim_script_if_needed(full_script_text, "优化后")
+                full_script_text = await _repair_episode_count_if_needed(full_script_text, "优化后")
 
             _log_progress(60, "最终剧本生成完成，正在提取人物/场景信息...")
 

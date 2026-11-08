@@ -595,8 +595,8 @@ body {
 
 /* Scenario picker (home) */
 .sfa-scenario-picker {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 8px;
     margin-bottom: 16px;
 }
@@ -607,7 +607,6 @@ body {
     align-items: flex-start;
     gap: 2px;
     min-width: 0;
-    max-width: 240px;
     padding: 8px 14px;
     border: 1px solid var(--lp-border-subtle);
     border-radius: var(--lp-radius-control);
@@ -659,13 +658,10 @@ body {
 }
 
 .sfa-scenario-tab-tagline {
-    overflow: hidden;
     max-width: 100%;
     color: var(--lp-text-muted);
     font-size: 12px;
     line-height: 1.4;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .sfa-scenario-tab-active .sfa-scenario-tab-tagline {
@@ -882,6 +878,13 @@ body {
         flex: 1 1 auto;
         justify-content: center;
     }
+}
+
+/* 侧栏收起时宽度归零（覆盖窄屏下的固定宽度） */
+.sfa-sidebar[data-open="false"] {
+    width: 0 !important;
+    border-right: 0 !important;
+    box-shadow: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

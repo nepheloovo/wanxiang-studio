@@ -184,7 +184,7 @@ export default function StoryboardStage({
           <div className="flex min-w-0 flex-col">
             <h2 className="text-lg font-semibold text-gray-800">{stage?.name || '分镜设计'}</h2>
             <p className="text-sm text-gray-500">
-              生成分段分镜脚本 (景别·时长·叙事内容) 以及指导性的视觉流转设计
+              把剧本拆成一个个镜头，写清每个镜头拍什么、拍多远、多长时间。可以直接修改镜头内容。
             </p>
           </div>
 
@@ -210,10 +210,6 @@ export default function StoryboardStage({
             
             {isEditing && (
               <div className="flex items-center gap-2">
-                <div className="bg-gray-100 p-1 rounded-lg flex items-center mr-2">
-                  <button onClick={() => switchEditMode('structured')} className={`px-2 py-1 text-[10px] font-medium rounded-md transition-all ${editMode === 'structured' ? 'bg-white text-neutral-900 shadow-sm' : 'text-gray-500'}`}>可视化</button>
-                  <button onClick={() => switchEditMode('raw')} className={`px-2 py-1 text-[10px] font-medium rounded-md transition-all ${editMode === 'raw' ? 'bg-white text-neutral-900 shadow-sm' : 'text-gray-500'}`}>JSON</button>
-                </div>
                 <button onClick={cancelEdit} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:bg-gray-100">
                   <X className="w-3.5 h-3.5" />取消
                 </button>
@@ -386,7 +382,7 @@ export default function StoryboardStage({
         status={state.status}
         onConfirm={onConfirm} 
         onEdit={!isEditing ? startEdit : undefined}
-        onSave={isEditing ? handleSave : undefined}
+        onSave={undefined}
         onRegenerate={onRegenerate} 
         showConfirm={showConfirm} 
         isRunning={isRunning} 

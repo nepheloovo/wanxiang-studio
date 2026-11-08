@@ -554,7 +554,7 @@ export default function ReferenceStage({ stage, state, sessionId, onConfirm, onI
           <h2 className="text-lg font-semibold text-gray-800">{stage?.name || '参考图生成'}</h2>
         </div>
         <p className="text-sm text-gray-500 mb-6">
-          基于角色/场景素材 + 分镜视觉描述，使用图生图生成场景参考图
+          按分镜为每个镜头画出画面。每个镜头可以生成多张，选一张最满意的用来做视频。
         </p>
 
         {/* 运行中 */}

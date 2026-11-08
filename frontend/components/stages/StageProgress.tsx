@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Loader } from 'lucide-react';
 
 interface StageProgressProps {
@@ -30,6 +30,15 @@ export default function StageProgress({
   color = 'blue',
 }: StageProgressProps) {
   const p = Math.min(100, Math.max(0, Math.round(progress)));
+  // 计时从进度条出现开始；只用来让用户知道"还在跑"，不是精确耗时
+  const [startedAt] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const elapsed = Math.max(0, Math.floor((now - startedAt) / 1000));
+  const elapsedText = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
   const c = BAR_COLORS[color] || BAR_COLORS.blue;
 
   // Extract step description: progressMessage format is "阶段名: 步骤描述"
@@ -50,6 +59,9 @@ export default function StageProgress({
           style={{ width: `${p}%` }}
         />
       </div>
+      <p className="mt-2 text-xs text-gray-400">
+        已等待 {elapsedText}。AI 生成通常要几分钟，进度条停一会儿是正常的；可以先离开，稍后在「我的作品」里找回。
+      </p>
     </div>
   );
 }

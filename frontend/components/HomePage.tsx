@@ -1,7 +1,8 @@
 ﻿'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings2, Clock, ArrowRight, CheckCircle, Trash2, Globe, ListOrdered, Loader2, Film, ImageIcon } from 'lucide-react';
+import { Settings2, Clock, ArrowRight, CheckCircle, Trash2, Globe, ListOrdered, Loader2, Film, ImageIcon, ChevronDown, X } from 'lucide-react';
+import ModelSelect from '@/components/ModelSelect';
 import clsx from 'clsx';
 import { brand } from '@/config/brand';
 import {
@@ -18,8 +19,8 @@ import { fetchScenarios, type Scenario } from '@/lib/workflowApi';
 const SCENARIO_STORAGE_KEY = `${brand.storagePrefix}.scenario`;
 
 /* 首页默认文案：场景未声明 ui 字段或场景列表加载失败时使用 */
-const DEFAULT_HERO_TITLE = 'Hi，一起聊聊你的创作想法';
-const DEFAULT_HERO_SUBTITLE = '从一句灵感开始，让 AI 陪你完成整部作品';
+const DEFAULT_HERO_TITLE = '写下一句灵感，生成你的作品';
+const DEFAULT_HERO_SUBTITLE = 'AI 一步步帮你完成，每一步都可以修改';
 const DEFAULT_PLACEHOLDER = '描述你的想法，输入一段故事、一个画面或一句灵感……';
 
 function readStoredScenario(): string {
@@ -124,7 +125,11 @@ export default function HomePage({ onStartProject, onResumeProject, onDeleteSess
   const [configError, setConfigError] = useState('');
   const [enableConcurrency, setEnableConcurrency] = useState(true);
   const [webSearch, setWebSearch] = useState(false);
-  const [episodes, setEpisodes] = useState(4);
+  const [episodes, setEpisodes] = useState(1);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [pendingStart, setPendingStart] = useState<null | { auto: boolean }>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
+  const promptRef = useRef<HTMLTextAreaElement>(null);
   const [showEpisodesPanel, setShowEpisodesPanel] = useState(false);
 
   // 场景包
@@ -311,6 +316,13 @@ export default function HomePage({ onStartProject, onResumeProject, onDeleteSess
 
   const handleStart = (auto?: boolean) => {
     if (!canStart) return;
+    setPendingStart({ auto: Boolean(auto) });
+  };
+
+  const confirmStart = () => {
+    if (!pendingStart || !canStart) return;
+    const auto = pendingStart.auto;
+    setPendingStart(null);
     onStartProject({
       scenario: selectedScenario?.id,
       idea,
@@ -336,7 +348,28 @@ export default function HomePage({ onStartProject, onResumeProject, onDeleteSess
 
   const handleExampleClick = (text: string) => {
     setIdea(text);
+    composerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    window.setTimeout(() => {
+      const input = promptRef.current;
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(text.length, text.length);
+    }, 350);
   };
+
+  const modelLabel = (providers: ProviderGroup[], id: string) => {
+    for (const group of providers) {
+      const found = group.models.find(model => model.id === id);
+      if (found) return found.label;
+    }
+    return id;
+  };
+  const stageCount = selectedScenario?.stages.length || 6;
+  const firstStageName = selectedScenario?.stages[0]?.name || '第一步';
+  const scriptMinutes = Math.max(3, (showEpisodes ? episodes : 1) * 3);
+  const startHint = !idea.trim() && !uploadedFile
+    ? '先在上面写下你的想法，或点下方的灵感示例'
+    : configLoading ? '正在读取配置……' : !modelConfigReady ? '模型配置不完整，请打开「生成配置」检查' : '';
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -427,8 +460,9 @@ export default function HomePage({ onStartProject, onResumeProject, onDeleteSess
         )}
 
         {/* 输入区域 */}
-        <div className="sfa-composer bg-white rounded-2xl shadow-sm border border-gray-200 p-5 mb-6">
+        <div ref={composerRef} className="sfa-composer bg-white rounded-2xl shadow-sm border border-gray-200 p-5 mb-6">
           <textarea
+            ref={promptRef}
             value={idea}
             onChange={e => setIdea(e.target.value)}
             placeholder={selectedScenario?.ui?.placeholder || DEFAULT_PLACEHOLDER}
@@ -502,7 +536,7 @@ export default function HomePage({ onStartProject, onResumeProject, onDeleteSess
                             每集预估时长约 1–2 分钟
                           </p>
                           <p className="text-[10px] text-neutral-400/80 leading-tight">
-                            推荐设置 4–6 集
+                            建议先做 1 集看效果，满意再加；集数越多等得越久
                           </p>
                         </div>
                         )}
@@ -577,29 +611,35 @@ export default function HomePage({ onStartProject, onResumeProject, onDeleteSess
                 onClick={() => handleStart(false)}
                 disabled={!canStart}
                 className={clsx(
-                  'sfa-action-secondary flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium transition-colors',
-                  canStart
-                    ? 'bg-white text-gray-900 hover:bg-gray-50 border border-gray-300'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                )}
-              >
-                逐步创作
-              </button>
-              <button
-                onClick={() => handleStart(true)}
-                disabled={!canStart}
-                className={clsx(
                   'sfa-action-primary flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors',
                   canStart
                     ? 'bg-neutral-900 text-white hover:bg-neutral-700 shadow-sm'
                     : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 )}
-                title={`自动执行全部 ${selectedScenario?.stages.length || ''} 个阶段，无需手动确认`.replace('  ', ' ')}
+                title={canStart ? '每完成一步就停下来给你看，可以修改后再继续' : startHint}
+              >
+                逐步创作（推荐）
+              </button>
+              <button
+                onClick={() => handleStart(true)}
+                disabled={!canStart}
+                className={clsx(
+                  'sfa-action-secondary flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium transition-colors',
+                  canStart
+                    ? 'bg-white text-gray-900 hover:bg-gray-50 border border-gray-300'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                )}
+                title={canStart ? `自动跑完全部 ${stageCount} 步，中途不停` : startHint}
               >
                 一键生成
               </button>
             </div>
           </div>
+          <p className="sfa-start-hint mt-3 text-right text-xs text-gray-400">
+            {startHint && !configError
+              ? startHint
+              : <>「逐步创作」每完成一步停下来给你看，可修改后再继续（推荐）；「一键生成」自动跑完全部 {stageCount} 步。</>}
+          </p>
           {(configLoading || configError) && (
             <div className={clsx('mt-3 text-xs', configError ? 'text-red-500' : 'text-gray-400')}>
               {configError || '正在读取默认模型……'}
@@ -678,79 +718,40 @@ export default function HomePage({ onStartProject, onResumeProject, onDeleteSess
                 </label>
               </div>
 
-              <div className="space-y-3 border-t border-gray-200/70 pt-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-500 font-semibold">模型配置</span>
-                  <span className="text-[10px] text-gray-400">用于主流程各阶段调用</span>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
+              <div className="border-t border-gray-200/70 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced(value => !value)}
+                  className="flex w-full items-center justify-between py-1 text-left"
+                  aria-expanded={showAdvanced}
+                >
+                  <span className="text-gray-500 font-semibold">高级设置：选择 AI 模型</span>
+                  <span className="flex items-center gap-1 text-[11px] text-gray-400">
+                    一般不用改
+                    <ChevronDown className={clsx('h-3.5 w-3.5 transition-transform', showAdvanced && 'rotate-180')} />
+                  </span>
+                </button>
+                {showAdvanced && (
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label className="flex flex-col gap-1">
-                  <span className="text-gray-500 font-medium">LLM 模型</span>
-                  <select
-                    value={selectedLLM}
-                    onChange={e => setSelectedLLM(e.target.value)}
-                    className="bg-white border border-gray-200 rounded-lg px-2.5 py-2 text-gray-700 outline-none"
-                  >
-                    {llmProviders.map(pg => (
-                      <optgroup key={pg.provider} label={pg.label}>
-                        {pg.models.map(m => (
-                          <option key={m.id} value={m.id}>{m.label}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
+                  <span className="text-gray-500 font-medium">写剧本、分镜用的模型</span>
+                  <ModelSelect value={selectedLLM} providers={llmProviders} onChange={setSelectedLLM} />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-gray-500 font-medium">VLM 评估模型</span>
-                  <select
-                    value={selectedVLM}
-                    onChange={e => setSelectedVLM(e.target.value)}
-                    className="bg-white border border-gray-200 rounded-lg px-2.5 py-2 text-gray-700 outline-none"
-                  >
-                    {vlmProviders.map(pg => (
-                      <optgroup key={pg.provider} label={pg.label}>
-                        {pg.models.map(m => (
-                          <option key={m.id} value={m.id}>{m.label}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
+                  <span className="text-gray-500 font-medium">检查画面用的模型</span>
+                  <ModelSelect value={selectedVLM} providers={vlmProviders} onChange={setSelectedVLM} />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-gray-500 font-medium">文生图</span>
-                  <select
-                    value={selectedT2I}
-                    onChange={e => setSelectedT2I(e.target.value)}
-                    className="bg-white border border-gray-200 rounded-lg px-2.5 py-2 text-gray-700 outline-none"
-                  >
-                    {t2iProviders.map(pg => (
-                      <optgroup key={pg.provider} label={pg.label}>
-                        {pg.models.map(m => (
-                          <option key={m.id} value={m.id}>{m.label}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
+                  <span className="text-gray-500 font-medium">画图模型（文字生成图片）</span>
+                  <ModelSelect value={selectedT2I} providers={t2iProviders} onChange={setSelectedT2I} />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-gray-500 font-medium">图生图</span>
-                  <select
-                    value={selectedI2I}
-                    onChange={e => setSelectedI2I(e.target.value)}
-                    className="bg-white border border-gray-200 rounded-lg px-2.5 py-2 text-gray-700 outline-none"
-                  >
-                    {i2iProviders.map(pg => (
-                      <optgroup key={pg.provider} label={pg.label}>
-                        {pg.models.map(m => (
-                          <option key={m.id} value={m.id}>{m.label}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
+                  <span className="text-gray-500 font-medium">改图模型（参考图片生成）</span>
+                  <ModelSelect value={selectedI2I} providers={i2iProviders} onChange={setSelectedI2I} />
                 </label>
                 {requiresVideo && (<>
-                <label className="flex flex-col gap-1 col-span-2">
-                  <span className="text-gray-500 font-medium">视频生成方式</span>
+                <label className="flex flex-col gap-1 sm:col-span-2">
+                  <span className="text-gray-500 font-medium">视频怎么生成</span>
                   <select
                     value={selectedVideoMode}
                     onChange={e => setSelectedVideoMode(e.target.value as VideoGenerationMode)}
@@ -761,33 +762,22 @@ export default function HomePage({ onStartProject, onResumeProject, onDeleteSess
                     ))}
                   </select>
                 </label>
-                <label className="flex flex-col gap-1 col-span-2">
-                  <span className="text-gray-500 font-medium">{selectedVideoModeLabel}模型</span>
-                  <select
-                    value={activeVideoModel}
-                    onChange={e => setActiveVideoModel(e.target.value)}
-                    className="bg-white border border-gray-200 rounded-lg px-2.5 py-2 text-gray-700 outline-none"
-                  >
-                    {activeVideoProviders.map(pg => (
-                      <optgroup key={pg.provider} label={pg.label}>
-                        {pg.models.map(m => (
-                          <option key={m.id} value={m.id}>{m.label}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
+                <label className="flex flex-col gap-1 sm:col-span-2">
+                  <span className="text-gray-500 font-medium">视频模型（{selectedVideoModeLabel}）</span>
+                  <ModelSelect value={activeVideoModel} providers={activeVideoProviders} onChange={setActiveVideoModel} />
                 </label>
                 </>)}
-                <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                <label className="flex items-center gap-2 text-sm cursor-pointer select-none sm:col-span-2">
                   <input
                     type="checkbox"
                     checked={enableConcurrency}
                     onChange={e => setEnableConcurrency(e.target.checked)}
                     className="w-4 h-4 rounded border-gray-300 text-neutral-900 focus:ring-neutral-900/30"
                   />
-                  <span className="text-gray-600">并发生成</span>
+                  <span className="text-gray-600">同时生成多个画面（更快）</span>
                 </label>
                 </div>
+                )}
               </div>
             </div>
           )}
@@ -902,6 +892,70 @@ export default function HomePage({ onStartProject, onResumeProject, onDeleteSess
                 </div>
                 );
               })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 开始前确认卡：说清做什么、用什么、要多久 */}
+      {pendingStart && (
+        <div className="sfa-dialog-scrim fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={() => setPendingStart(null)}>
+          <div
+            className="sfa-start-dialog relative w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="start-dialog-title"
+            onClick={event => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setPendingStart(null)}
+              className="absolute right-4 top-4 rounded-md p-1 text-gray-400 hover:text-gray-700"
+              aria-label="关闭"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <h4 id="start-dialog-title" className="text-base font-semibold text-gray-900">
+              {pendingStart.auto ? '确认一键生成' : '确认开始创作'}
+            </h4>
+            <p className="mt-1 line-clamp-2 text-xs text-gray-500">{idea.trim() || uploadedFile?.name}</p>
+            <dl className="mt-4 space-y-2 rounded-xl bg-gray-50 p-4 text-xs">
+              <div className="flex justify-between gap-4"><dt className="text-gray-400">类型</dt><dd className="text-gray-700">{selectedScenario?.name || '默认'}</dd></div>
+              {showEpisodes && (
+                <div className="flex justify-between gap-4"><dt className="text-gray-400">{episodesLabel}</dt><dd className="text-gray-700">{episodes}{episodesUnit || ' 个'}</dd></div>
+              )}
+              <div className="flex justify-between gap-4"><dt className="text-gray-400">风格 / 比例</dt><dd className="text-gray-700">{styleOptions.find(item => item.id === selectedStyle)?.label || selectedStyle} · {selectedRatio}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-gray-400">方式</dt><dd className="text-right text-gray-700">{pendingStart.auto ? `自动跑完全部 ${stageCount} 步` : `每步停下来等你确认，共 ${stageCount} 步`}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-gray-400">使用模型</dt><dd className="text-right text-gray-700">
+                文字 {modelLabel(llmProviders, selectedLLM)}<br />
+                图片 {modelLabel(t2iProviders, selectedT2I)}
+                {requiresVideo && activeVideoModel ? <><br />视频 {modelLabel(activeVideoProviders, activeVideoModel)}</> : null}
+              </dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-gray-400">预计时间</dt><dd className="text-right text-gray-700">
+                {pendingStart.auto
+                  ? `较长，通常 30 分钟以上（镜头越多越久）`
+                  : `「${firstStageName}」约 ${scriptMinutes} 分钟`}
+              </dd></div>
+            </dl>
+            <p className="mt-3 text-[11px] leading-relaxed text-gray-400">
+              会消耗你在「设置」里填写的模型服务额度。生成中可以离开页面，之后在「我的作品」里找回。
+            </p>
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingStart(null)}
+                className="flex-1 rounded-xl border border-gray-200 py-2 text-sm text-gray-600 hover:bg-gray-50"
+              >
+                再改改
+              </button>
+              <button
+                type="button"
+                onClick={confirmStart}
+                autoFocus
+                className="flex-1 rounded-xl bg-neutral-900 py-2 text-sm font-medium text-white hover:bg-neutral-700"
+              >
+                开始生成
+              </button>
             </div>
           </div>
         </div>
