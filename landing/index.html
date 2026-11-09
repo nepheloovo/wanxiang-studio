@@ -146,6 +146,19 @@ let seed = 20251106;
 const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 const gauss = () => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(6.2831853 * v); };
 
+// Hovering the arrow turns flowers into meteors. The flower points and the streak
+// layer share this timing, so a flower disappears exactly while its meteor is flying.
+const METEOR_GLSL = `
+  const float METEOR_RATE = .55;
+  float meteorLife(float seed, float clock){
+    float k = fract(seed * 53.1);
+    float dur = 1.1 + k * .7, period = dur + 5. + fract(seed * 17.3) * 11.;
+    float tt = clock - fract(seed * 311.7) * period;
+    if (tt < 0.) return -1.;
+    float l = fract(tt / period) * period / dur;
+    return l > 1. ? -1. : l;
+  }`;
+
 class Valley {
   constructor(container, onLoaded, onIntroDone) {
     this.onLoaded = onLoaded; this.onIntroDone = onIntroDone;
@@ -243,11 +256,12 @@ class Valley {
     this.fieldMat = new THREE.ShaderMaterial({
       uniforms: {
         uTime: { value: 0 }, uCam: { value: new THREE.Vector3() }, uMouse: { value: new THREE.Vector2(9, 9) },
-        uAspect: { value: innerWidth / innerHeight }, uScale: { value: 210 * this.dpr }, uDisperse: { value: 0 }, uBright: { value: .62 }
+        uAspect: { value: innerWidth / innerHeight }, uScale: { value: 210 * this.dpr }, uDisperse: { value: 0 }, uBright: { value: .62 }, uFall: { value: 0 }, uAmt: { value: 0 }
       },
       vertexShader: `
-        uniform float uTime, uAspect, uScale, uDisperse; uniform vec3 uCam; uniform vec2 uMouse;
+        uniform float uTime, uAspect, uScale, uDisperse, uFall, uAmt; uniform vec3 uCam; uniform vec2 uMouse;
         attribute vec3 aColor; attribute float aSize, aSeed, aType;
+        ${METEOR_GLSL}
         varying vec3 vColor; varying float vAlpha, vGlow, vSeed, vType, vCore;
         void main(){
           vec3 p = position;
@@ -271,6 +285,14 @@ class Valley {
           gl_PointSize = clamp(s * uScale / max(-mv.z, .5), 0., 64.);
           vGlow = push * (aType < .5 ? 1. : .4) + g * .9;
           vAlpha = exp(-d * d * .000045) * smoothstep(.8, 5., -mv.z) * (aType < .5 ? 1. : .5);
+          if (aType < .5 && uAmt > 0.) {
+            if (aSeed < METEOR_RATE) {
+              float l = meteorLife(aSeed, uFall);
+              if (l >= 0.) vAlpha *= 1. - uAmt * smoothstep(0., .05, l) * (1. - smoothstep(.93, 1., l));
+            } else {
+              vAlpha *= 1. - uAmt * .7;
+            }
+          }
           vColor = aColor; vSeed = aSeed; vType = aType; vCore = g;
         }`,
       fragmentShader: `
@@ -304,6 +326,7 @@ class Valley {
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
     });
     this.scene.add(new THREE.Points(g, this.fieldMat));
+    this.fieldData = { pos, col, size, sd, nF };
   }
 
   buildRays() {
@@ -350,45 +373,65 @@ class Valley {
     this.scene.add(new THREE.Points(g, this.dustMat));
   }
 
-  // meteor shower: screen-space streaks, only visible while the arrow is hovered
+  // meteor shower: each streak starts from a real flower's position in the sky
   buildMeteors() {
-    const n = 110, v = n * 4;
-    const pos = new Float32Array(v * 3), corner = new Float32Array(v * 2), seed = new Float32Array(v * 4), col = new Float32Array(v * 3), idx = [];
-    const palette = [[1, .95, .86], [1, .86, .6], [1, .8, .82], [.88, .84, 1]];
+    const { pos, col, size, sd, nF } = this.fieldData;
+    const picked = [];
+    for (let i = 0; i < nF; i++) if (sd[i] < .55) picked.push(i);
+    const n = picked.length, v = n * 4;
+    const p = new Float32Array(v * 3), corner = new Float32Array(v * 2), seed = new Float32Array(v), color = new Float32Array(v * 3), sz = new Float32Array(v);
+    const idx = new Uint32Array(n * 6);
     const quad = [[0, -1], [1, -1], [1, 1], [0, 1]];
-    for (let i = 0; i < n; i++) {
-      const sd = [rnd(), rnd(), rnd(), rnd()], c = palette[Math.floor(rnd() * palette.length)], b = i * 4;
-      quad.forEach((q, k) => { corner.set(q, (b + k) * 2); seed.set(sd, (b + k) * 4); col.set(c, (b + k) * 3); });
-      idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
-    }
+    picked.forEach((f, i) => {
+      const b = i * 4;
+      quad.forEach((q, k) => {
+        p.set([pos[f * 3], pos[f * 3 + 1], pos[f * 3 + 2]], (b + k) * 3);
+        corner.set(q, (b + k) * 2);
+        color.set([col[f * 3], col[f * 3 + 1], col[f * 3 + 2]], (b + k) * 3);
+        seed[b + k] = sd[f]; sz[b + k] = size[f];
+      });
+      idx.set([b, b + 1, b + 2, b, b + 2, b + 3], i * 6);
+    });
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('position', new THREE.BufferAttribute(p, 3));
     g.setAttribute('aCorner', new THREE.BufferAttribute(corner, 2));
-    g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 4));
-    g.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
-    g.setIndex(idx);
+    g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+    g.setAttribute('aSize', new THREE.BufferAttribute(sz, 1));
+    g.setAttribute('aColor', new THREE.BufferAttribute(color, 3));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
     this.meteorMat = new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uAmt: { value: 0 }, uAspect: { value: innerWidth / innerHeight }, uPx: { value: 2 / innerHeight } },
+      uniforms: { uFall: { value: 0 }, uAmt: { value: 0 }, uDisperse: { value: 0 }, uTime: { value: 0 }, uCam: { value: new THREE.Vector3() }, uAspect: { value: innerWidth / innerHeight }, uPx: { value: 2 / innerHeight } },
       vertexShader: `
-        uniform float uTime, uAmt, uAspect, uPx;
-        attribute vec2 aCorner; attribute vec4 aSeed; attribute vec3 aColor;
+        uniform float uFall, uAmt, uDisperse, uTime, uAspect, uPx; uniform vec3 uCam;
+        attribute vec2 aCorner; attribute float aSeed, aSize; attribute vec3 aColor;
         varying vec2 vC; varying vec3 vColor; varying float vA;
+        ${METEOR_GLSL}
         void main(){
-          float period = 1.6 + aSeed.x * 2.2, flight = .6;
-          float phase = uTime / period + aSeed.y;
-          float life = fract(phase) / flight;
-          if (life > 1. || uAmt <= 0.) { gl_Position = vec4(2., 2., 2., 1.); return; }
-          float cycle = floor(phase), pick = fract(aSeed.z + cycle * .618);
-          float near = aSeed.w * aSeed.w;
-          vec2 start = vec2(mix(-uAspect * .9, uAspect * 1.7, pick), mix(.5, 1.35, fract(pick * 7.13)));
-          vec2 dir = normalize(vec2(-.58 + (aSeed.x - .5) * .08, -1.));
+          gl_Position = vec4(2., 2., 2., 1.);
+          float life = uAmt > 0. ? meteorLife(aSeed, uFall) : -1.;
+          if (life < 0.) return;
+          // same lift as the flower point, so the meteor leaves from where the flower is
+          float g = uDisperse * uDisperse * (3. - 2. * uDisperse);
+          vec3 up = normalize(vec3(sin(aSeed * 91.7), .55 + fract(aSeed * 13.1), cos(aSeed * 57.3)));
+          vec3 w = position + up * g * (5. + fract(aSeed * 7.7) * 16.);
+          w.y += sin(uTime * .7 + aSeed * 40.) * g * 1.4;
+          vec4 mv = modelViewMatrix * vec4(w, 1.);
+          if (mv.z > -1.) return;
+          float d = distance(w, uCam);
+          float fog = exp(-d * d * .000045);
+          if (fog < .08) return;
+          vec4 clip = projectionMatrix * mv;
+          vec2 src = vec2(clip.x / clip.w * uAspect, clip.y / clip.w);
+          float near = smoothstep(120., 14., d);
+          float k = fract(aSeed * 53.1), dur = 1.1 + k * .7;
+          vec2 dir = normalize(vec2(-.58 + (k - .5) * .08, -1.));
           vec2 perp = vec2(-dir.y, dir.x);
-          vec2 head = start + dir * life * period * flight * mix(1.1, 2.4, near);
-          float len = mix(.16, .62, near) * smoothstep(0., .25, life);
-          vec2 p = head - dir * len * aCorner.x + perp * mix(2.5, 7., near) * uPx * aCorner.y;
+          vec2 head = src + dir * life * dur * mix(.9, 2.3, near);
+          float len = mix(.1, .5, near) * smoothstep(0., .3, life);
+          vec2 p = head - dir * len * aCorner.x + perp * mix(1.6, 5.5, near) * (.7 + aSize * .3) * uPx * aCorner.y;
           gl_Position = vec4(p.x / uAspect, p.y, 0., 1.);
           vC = aCorner; vColor = aColor;
-          vA = uAmt * smoothstep(0., .1, life) * (1. - smoothstep(.72, 1., life)) * mix(.55, 1., near);
+          vA = uAmt * fog * smoothstep(0., .08, life) * (1. - smoothstep(.72, 1., life)) * mix(.6, 1., near);
         }`,
       fragmentShader: `
         varying vec2 vC; varying vec3 vColor; varying float vA;
@@ -479,10 +522,14 @@ class Valley {
     this.final.uniforms.uVig.value = fast;
     this.final.uniforms.uSplit.value = .0015 + fast * .006;
     this.bloom.strength = .5 + this.disperse * .28;
+    this.bloom.threshold = .32 + this.disperse * .4; // keeps dim motes out of the bloom, which renders them as faint squares
     fu.uBright.value = .62 + this.disperse * .88;
+    // the flowers lift and brighten first, then start to fall
+    if (this.disperse < .03) this.fall = 0; else if (this.hoverTarget || this.fall) this.fall = (this.fall || 0) + dt * (this.disperse > .45 ? 1 : 0);
+    const amt = this.reduce ? 0 : Math.min(1, Math.max(0, (this.disperse - .3) / .4));
     const mu = this.meteorMat.uniforms;
-    mu.uTime.value = t;
-    mu.uAmt.value = this.reduce ? 0 : Math.min(1, Math.max(0, (this.disperse - .12) / .55));
+    mu.uTime.value = t; mu.uCam.value.copy(cam.position); mu.uDisperse.value = this.disperse; mu.uFall.value = this.fall; mu.uAmt.value = amt;
+    fu.uFall.value = this.fall; fu.uAmt.value = amt;
 
     this.composer.render();
     if (!this.loaded) { this.loaded = true; this.onLoaded(); }
@@ -502,7 +549,7 @@ const valley=new Valley(document.getElementById('valley'),
 audioStore().initAudio();
 const sound=document.getElementById('sound');
 sound.onclick=()=>{const s=audioStore();if(!s.isInitialized)return;const muted=s.toggleMute();sound.setAttribute('aria-pressed',String(!muted))};
-// hovering the arrow eases the camera to a stop, muffles the sound, brightens the flowers and starts the meteor shower
+// hovering the arrow eases the camera to a stop, muffles the sound, and turns the brightened flowers into falling meteors
 const go=document.getElementById('go');
 go.addEventListener('pointerenter',()=>valley.startHoverTransition());
 go.addEventListener('pointerleave',()=>valley.stopHoverTransition());
