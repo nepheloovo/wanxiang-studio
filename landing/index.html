@@ -174,6 +174,7 @@ class Valley {
     this.buildField();
     this.buildRays();
     this.buildDust();
+    this.buildMeteors();
     this.buildPost();
 
     this.mouse = new THREE.Vector2(0, 0); this.mouseT = new THREE.Vector2(0, 0);
@@ -242,7 +243,7 @@ class Valley {
     this.fieldMat = new THREE.ShaderMaterial({
       uniforms: {
         uTime: { value: 0 }, uCam: { value: new THREE.Vector3() }, uMouse: { value: new THREE.Vector2(9, 9) },
-        uAspect: { value: innerWidth / innerHeight }, uScale: { value: 210 * this.dpr }, uDisperse: { value: 0 }
+        uAspect: { value: innerWidth / innerHeight }, uScale: { value: 210 * this.dpr }, uDisperse: { value: 0 }, uBright: { value: .62 }
       },
       vertexShader: `
         uniform float uTime, uAspect, uScale, uDisperse; uniform vec3 uCam; uniform vec2 uMouse;
@@ -266,13 +267,14 @@ class Valley {
           ndc += (dm / max(md, 1e-4)) / vec2(uAspect, 1.) * push * .07;
           clip.xy = ndc * clip.w;
           gl_Position = clip;
-          float s = aSize * mix(aType < .5 ? .12 : .2, 1., grow) * mix(1., .4, g);
+          float s = aSize * mix(aType < .5 ? .12 : .2, 1., grow) * mix(1., .6, g);
           gl_PointSize = clamp(s * uScale / max(-mv.z, .5), 0., 64.);
           vGlow = push * (aType < .5 ? 1. : .4) + g * .9;
           vAlpha = exp(-d * d * .000045) * smoothstep(.8, 5., -mv.z) * (aType < .5 ? 1. : .5);
           vColor = aColor; vSeed = aSeed; vType = aType; vCore = g;
         }`,
       fragmentShader: `
+        uniform float uBright;
         varying vec3 vColor; varying float vAlpha, vGlow, vSeed, vType, vCore;
         void main(){
           vec2 c = gl_PointCoord * 2. - 1.;
@@ -287,8 +289,8 @@ class Valley {
             float mote = exp(-r * r * 7.);
             body = mix(body, mote, vCore);
             col = mix(vColor * .85, vec3(1., .94, .78), core * (1. - vCore));
-            col *= 1. + vGlow * 2.4;
-            alpha = (body * .9 + exp(-r * 3.2) * .25) * vAlpha;
+            col *= (1. + vGlow * 2.4) * uBright;
+            alpha = (body * .9 + exp(-r * 3.2) * .25) * vAlpha * (1. - smoothstep(.72, 1., r));
           } else {
             float a = vSeed * 6.2831;
             vec2 q = mat2(cos(a), -sin(a), sin(a), cos(a)) * c;
@@ -348,10 +350,67 @@ class Valley {
     this.scene.add(new THREE.Points(g, this.dustMat));
   }
 
+  // meteor shower: screen-space streaks, only visible while the arrow is hovered
+  buildMeteors() {
+    const n = 110, v = n * 4;
+    const pos = new Float32Array(v * 3), corner = new Float32Array(v * 2), seed = new Float32Array(v * 4), col = new Float32Array(v * 3), idx = [];
+    const palette = [[1, .95, .86], [1, .86, .6], [1, .8, .82], [.88, .84, 1]];
+    const quad = [[0, -1], [1, -1], [1, 1], [0, 1]];
+    for (let i = 0; i < n; i++) {
+      const sd = [rnd(), rnd(), rnd(), rnd()], c = palette[Math.floor(rnd() * palette.length)], b = i * 4;
+      quad.forEach((q, k) => { corner.set(q, (b + k) * 2); seed.set(sd, (b + k) * 4); col.set(c, (b + k) * 3); });
+      idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('aCorner', new THREE.BufferAttribute(corner, 2));
+    g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 4));
+    g.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+    g.setIndex(idx);
+    this.meteorMat = new THREE.ShaderMaterial({
+      uniforms: { uTime: { value: 0 }, uAmt: { value: 0 }, uAspect: { value: innerWidth / innerHeight }, uPx: { value: 2 / innerHeight } },
+      vertexShader: `
+        uniform float uTime, uAmt, uAspect, uPx;
+        attribute vec2 aCorner; attribute vec4 aSeed; attribute vec3 aColor;
+        varying vec2 vC; varying vec3 vColor; varying float vA;
+        void main(){
+          float period = 1.6 + aSeed.x * 2.2, flight = .6;
+          float phase = uTime / period + aSeed.y;
+          float life = fract(phase) / flight;
+          if (life > 1. || uAmt <= 0.) { gl_Position = vec4(2., 2., 2., 1.); return; }
+          float cycle = floor(phase), pick = fract(aSeed.z + cycle * .618);
+          float near = aSeed.w * aSeed.w;
+          vec2 start = vec2(mix(-uAspect * .9, uAspect * 1.7, pick), mix(.5, 1.35, fract(pick * 7.13)));
+          vec2 dir = normalize(vec2(-.58 + (aSeed.x - .5) * .08, -1.));
+          vec2 perp = vec2(-dir.y, dir.x);
+          vec2 head = start + dir * life * period * flight * mix(1.1, 2.4, near);
+          float len = mix(.16, .62, near) * smoothstep(0., .25, life);
+          vec2 p = head - dir * len * aCorner.x + perp * mix(2.5, 7., near) * uPx * aCorner.y;
+          gl_Position = vec4(p.x / uAspect, p.y, 0., 1.);
+          vC = aCorner; vColor = aColor;
+          vA = uAmt * smoothstep(0., .1, life) * (1. - smoothstep(.72, 1., life)) * mix(.55, 1., near);
+        }`,
+      fragmentShader: `
+        varying vec2 vC; varying vec3 vColor; varying float vA;
+        void main(){
+          float tail = pow(1. - vC.x, 2.2) * exp(-vC.y * vC.y * 14.);
+          float head = exp(-vC.x * vC.x * 60.) * exp(-vC.y * vC.y * 6.);
+          float a = clamp(tail + head, 0., 1.) * vA;
+          if (a < .005) discard;
+          vec3 col = mix(vColor, vec3(1.), 1. - vC.x * .7) * (1. + head * 1.1);
+          gl_FragColor = vec4(col, a);
+        }`,
+      transparent: true, depthWrite: false, depthTest: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending
+    });
+    const m = new THREE.Mesh(g, this.meteorMat);
+    m.frustumCulled = false; m.renderOrder = 10;
+    this.scene.add(m);
+  }
+
   buildPost() {
     const c = this.composer = new EffectComposer(this.renderer);
     c.addPass(new RenderPass(this.scene, this.camera));
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .75, .45, .32);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .5, .45, .32);
     c.addPass(this.bloom);
     c.addPass(new OutputPass());
     this.final = new ShaderPass({
@@ -375,6 +434,8 @@ class Valley {
     this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h); this.composer.setSize(w, h); this.bloom.setSize(w, h);
     this.fieldMat.uniforms.uAspect.value = w / h;
+    this.meteorMat.uniforms.uAspect.value = w / h;
+    this.meteorMat.uniforms.uPx.value = 2 / h;
   }
 
   startHoverTransition() { this.hoverTarget = 1; }
@@ -417,7 +478,11 @@ class Valley {
     this.final.uniforms.uTime.value = t;
     this.final.uniforms.uVig.value = fast;
     this.final.uniforms.uSplit.value = .0015 + fast * .006;
-    this.bloom.strength = .75 + this.disperse * .3;
+    this.bloom.strength = .5 + this.disperse * .28;
+    fu.uBright.value = .62 + this.disperse * .88;
+    const mu = this.meteorMat.uniforms;
+    mu.uTime.value = t;
+    mu.uAmt.value = this.reduce ? 0 : Math.min(1, Math.max(0, (this.disperse - .12) / .55));
 
     this.composer.render();
     if (!this.loaded) { this.loaded = true; this.onLoaded(); }
@@ -437,7 +502,7 @@ const valley=new Valley(document.getElementById('valley'),
 audioStore().initAudio();
 const sound=document.getElementById('sound');
 sound.onclick=()=>{const s=audioStore();if(!s.isInitialized)return;const muted=s.toggleMute();sound.setAttribute('aria-pressed',String(!muted))};
-// hovering the arrow eases the camera to a stop and muffles the sound
+// hovering the arrow eases the camera to a stop, muffles the sound, brightens the flowers and starts the meteor shower
 const go=document.getElementById('go');
 go.addEventListener('pointerenter',()=>valley.startHoverTransition());
 go.addEventListener('pointerleave',()=>valley.stopHoverTransition());
