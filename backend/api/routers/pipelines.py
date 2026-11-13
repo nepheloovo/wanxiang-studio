@@ -173,6 +173,11 @@ async def get_api_models(
                 "adapter_input_modalities": capabilities.get("adapter_input_modalities", []),
                 "api_contract_verified": capabilities.get("api_contract_verified", False),
                 "capabilities": capabilities,
+                # 注册表登记的单价（元），用于界面上预估费用
+                "price_per_image": model.get("price_per_image"),
+                "price_per_second": model.get("price_per_second"),
+                "price_per_1k_input_token": model.get("price_per_1k_input_token"),
+                "price_per_1k_output_token": model.get("price_per_1k_output_token"),
             })
         return {
             "models": models

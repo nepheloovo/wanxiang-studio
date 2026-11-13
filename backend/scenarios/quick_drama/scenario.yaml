@@ -1,0 +1,53 @@
+# 三镜短剧：单主角、3 个镜头、约 15 秒的竖屏极短剧。先确认分镜和画面，再花钱生成视频。
+# 与 comic_drama 相比：篇幅压到每集 3-5 行，写实画风，适合快速试一个创意。
+name: 三镜短剧
+tagline: 单主角 · 3 个镜头 · 约 15 秒
+description: 一句话生成一条竖屏极短剧：只有 1 位主角、1 个场景、3 个镜头。先确认分镜和画面，再生成视频，适合快速测试创意。
+category: video
+order: 25
+
+defaults:
+  style: realistic
+  video_ratio: "9:16"
+  video_resolution: 720P
+  video_generation_mode: first_frame
+  episodes: 1
+
+ui:
+  hero_title: 一句话，拍一条 15 秒的短剧
+  hero_subtitle: 单主角、3 个镜头。先看分镜和画面，满意了再生成视频
+  placeholder: 例如：女孩下班走进雨里，发现一只小猫，最后抱起小猫回家。
+  episodes_label: 条数
+  examples:
+    - title: 雨天小猫
+      description: 下班路上的温暖瞬间
+      idea: 女孩下班走进雨里，发现屋檐下一只湿漉漉的小猫，最后把伞留给小猫、自己笑着跑回家。
+    - title: 面试逆袭
+      description: 一句话反转
+      idea: 面试官看完简历冷笑说不合适，求职者平静地说出自己就是公司新任投资人的女儿派来考察的。
+    - title: 早餐摊
+      description: 老板的小心思
+      idea: 清晨早餐摊老板每天给一位赶地铁的学生多塞一个鸡蛋，今天学生终于发现，并留下一张写着谢谢的纸条。
+
+stages:
+  - type: script_generation
+    name: 短剧剧本
+    short_name: 剧本
+    options:
+      min_episode_lines: 3
+      max_episode_lines: 5
+  - type: character_design
+    name: 角色设定
+    short_name: 角色
+  - type: storyboard
+    name: 分镜
+    short_name: 分镜
+  - type: reference_generation
+    name: 画面
+    short_name: 画面
+  - type: video_generation
+    name: 视频生成
+    short_name: 视频
+  - type: post_production
+    name: 成片剪辑
+    short_name: 成片

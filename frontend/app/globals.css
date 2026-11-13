@@ -155,6 +155,7 @@
     --lp-radius-feature: var(--radius-20);
     --lp-radius-pill: var(--radius-pill);
     --lp-opacity-disabled: 0.4;
+    --app-nav-height: 56px;
 }
 
 @theme inline {
@@ -366,13 +367,184 @@ body {
 .sfa-main {
     position: relative;
     min-height: 100vh;
+    padding-top: var(--app-nav-height);
     background: var(--lp-canvas-app);
 }
 
+/* 画布页：占满导航以下的整屏，不出现页面滚动 */
+.sfa-main-canvas {
+    height: 100vh;
+    min-height: 0;
+    overflow: hidden !important;
+}
+
+/* 顶部导航 */
+.sfa-topnav {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: var(--app-nav-height);
+    padding: 0 16px;
+    border-bottom: 1px solid var(--lp-border-divider);
+    background: var(--lp-surface);
+}
+
+.sfa-topnav-brand {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 10px;
+    color: var(--lp-text-strong);
+}
+
+.sfa-topnav-logo {
+    display: grid;
+    width: 30px;
+    height: 30px;
+    place-items: center;
+    border-radius: var(--lp-radius-compact);
+    background: var(--lp-text-strong);
+    color: var(--lp-text-inverse);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.sfa-topnav-name {
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+}
+
+.sfa-topnav-main {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin: 0 auto;
+    padding: 3px;
+    border: 1px solid var(--lp-border-subtle);
+    border-radius: var(--lp-radius-control);
+    background: var(--lp-canvas-app);
+}
+
+.sfa-topnav-link,
+.sfa-topnav-icon {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 14px;
+    border-radius: var(--lp-radius-compact);
+    color: var(--lp-text-muted);
+    font-size: 14px;
+    white-space: nowrap;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.sfa-topnav-link:hover,
+.sfa-topnav-icon:hover {
+    background: var(--lp-surface-hover);
+    color: var(--lp-text-strong);
+}
+
+.sfa-topnav-link.is-active,
+.sfa-topnav-icon.is-active {
+    background: var(--lp-surface-soft);
+    color: var(--lp-text-strong);
+    font-weight: 500;
+}
+
+.sfa-topnav-actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 4px;
+}
+
+.sfa-topnav-icon {
+    padding: 0 10px;
+}
+
+.sfa-topnav-badge {
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: var(--lp-radius-pill);
+    background: var(--lp-text-strong);
+    color: var(--lp-text-inverse);
+    font-size: 11px;
+    line-height: 18px;
+    text-align: center;
+}
+
+.sfa-topnav-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    z-index: 60;
+    padding: 6px;
+    border: 1px solid var(--lp-border-subtle);
+    border-radius: var(--lp-radius-control);
+    background: var(--lp-surface);
+    box-shadow: var(--lp-shadow-popover);
+}
+
+.sfa-topnav-menu-item {
+    display: flex;
+    width: 100%;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: var(--lp-radius-compact);
+    color: var(--lp-text-default);
+    font-size: 14px;
+    text-align: left;
+}
+
+.sfa-topnav-menu-item:hover,
+.sfa-topnav-menu-item.is-active {
+    background: var(--lp-surface-hover);
+    color: var(--lp-text-strong);
+}
+
+.sfa-topnav-menu .sfa-task-panel:first-child {
+    border-top: 0 !important;
+}
+
+.sfa-topnav-menu .sfa-task-panel-filled {
+    height: auto !important;
+    max-height: 40vh;
+}
+
+@media (max-width: 760px) {
+    .sfa-topnav {
+        gap: 8px;
+        padding: 0 8px;
+    }
+
+    .sfa-topnav-name {
+        display: none;
+    }
+
+    .sfa-topnav-main {
+        margin: 0;
+    }
+
+    .sfa-topnav-link {
+        padding: 0 9px;
+    }
+
+    .sfa-topnav-link span {
+        display: none;
+    }
+}
+
 .sfa-shell header {
-    top: 0;
+    top: var(--app-nav-height) !important;
     right: 0;
-    left: var(--app-sidebar-width);
+    left: 0 !important;
     border: 0;
     border-bottom: 1px solid var(--lp-border-divider);
     border-radius: 0;
@@ -899,4 +1071,356 @@ body {
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
+}
+
+/* ── 画布页 ── */
+.sfa-canvas-page {
+    background: var(--lp-canvas-app);
+}
+
+.sfa-canvas {
+    background-color: var(--lp-canvas-app);
+    background-image: radial-gradient(circle, var(--lp-border-subtle) 1px, transparent 1.2px);
+}
+
+.sfa-canvas-shape {
+    border-radius: 10px;
+    background: var(--lp-surface-subtle);
+    outline: 0 solid transparent;
+    outline-offset: 2px;
+    box-shadow: 0 6px 18px var(--color-shadow-black-a8);
+}
+
+.sfa-canvas-shape.is-selected {
+    outline-style: solid;
+    outline-color: var(--lp-text-strong);
+}
+
+.sfa-canvas-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 7px;
+    border-radius: var(--lp-radius-pill);
+    background: rgba(0, 0, 0, 0.72);
+    font-size: 11px;
+    line-height: 1.2;
+}
+
+.sfa-canvas-delete {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 9999px;
+    border: 1px solid var(--lp-border-strong, rgba(255, 255, 255, 0.24));
+    background: #1a1a1a;
+    color: #e5e5e5;
+    transform-origin: center;
+    z-index: 2;
+    cursor: pointer;
+}
+
+.sfa-canvas-delete:hover {
+    background: #2a2a2a;
+    color: #fff;
+}
+
+.sfa-canvas-marquee {
+    border: 1px solid var(--lp-text-muted);
+    background: var(--lp-surface-hover);
+    pointer-events: none;
+}
+
+.sfa-canvas-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    border: 1px solid var(--lp-border-subtle);
+    border-radius: var(--lp-radius-control);
+    background: var(--lp-surface);
+    box-shadow: var(--lp-shadow-popover);
+}
+
+.sfa-canvas-toolbar button {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    border-radius: var(--lp-radius-compact);
+    color: var(--lp-text-muted);
+}
+
+.sfa-canvas-toolbar button:hover:not(:disabled) {
+    background: var(--lp-surface-hover);
+    color: var(--lp-text-strong);
+}
+
+.sfa-canvas-toolbar button.is-active {
+    background: var(--lp-text-strong);
+    color: var(--lp-text-inverse);
+}
+
+.sfa-canvas-toolbar button:disabled {
+    opacity: var(--lp-opacity-disabled);
+}
+
+.sfa-canvas-toolbar-divider {
+    width: 1px;
+    height: 20px;
+    margin: 0 4px;
+    background: var(--lp-border-subtle);
+}
+
+.sfa-canvas-empty {
+    max-width: 420px;
+    padding: 28px 32px;
+    border: 1px solid var(--lp-border-subtle);
+    border-radius: var(--lp-radius-card);
+    background: var(--lp-surface);
+    text-align: center;
+    box-shadow: var(--lp-shadow-popover);
+}
+
+.sfa-canvas-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--lp-border-subtle);
+    border-radius: var(--lp-radius-pill);
+    background: var(--lp-surface);
+    color: var(--lp-text-muted);
+    font-size: 13px;
+}
+
+.sfa-canvas-pill:hover {
+    color: var(--lp-text-strong);
+}
+
+/* ── 画布右侧面板 ── */
+.sfa-canvas-panel-wrap {
+    background: var(--lp-surface);
+}
+
+@media (max-width: 899px) {
+    .sfa-canvas-panel-wrap {
+        height: 55%;
+    }
+}
+
+.sfa-panel-tab,
+.sfa-panel-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 8px;
+    border: 1px solid var(--lp-border-subtle);
+    border-radius: var(--lp-radius-compact);
+    color: var(--lp-text-muted);
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.sfa-panel-chip {
+    height: 32px;
+    font-size: 12px;
+}
+
+.sfa-panel-tab:hover,
+.sfa-panel-chip:hover {
+    border-color: var(--lp-border-strong);
+    color: var(--lp-text-strong);
+}
+
+.sfa-panel-tab.is-active,
+.sfa-panel-chip.is-active {
+    border-color: var(--lp-text-strong);
+    background: var(--lp-text-strong);
+    color: var(--lp-text-inverse);
+    font-weight: 500;
+}
+
+.sfa-panel-tag {
+    padding: 4px 10px;
+    border: 1px solid var(--lp-border-subtle);
+    border-radius: var(--lp-radius-pill);
+    color: var(--lp-text-muted);
+    font-size: 12px;
+}
+
+.sfa-panel-tag:hover {
+    border-color: var(--lp-border-strong);
+    color: var(--lp-text-strong);
+}
+
+.sfa-panel-input {
+    padding: 9px 11px;
+    border: 1px solid var(--lp-border-subtle);
+    border-radius: var(--lp-radius-compact);
+    background: var(--lp-canvas-app);
+    color: var(--lp-text-default);
+    font-size: 13px;
+    line-height: 1.6;
+    outline: none;
+}
+
+.sfa-panel-input:focus {
+    border-color: var(--lp-border-strong);
+}
+
+.sfa-panel-input::placeholder {
+    color: var(--lp-text-subtle);
+}
+
+.sfa-panel-card {
+    padding: 10px;
+    border: 1px solid var(--lp-border-subtle);
+    border-radius: var(--lp-radius-compact);
+    color: var(--lp-text-default);
+    text-align: left;
+}
+
+.sfa-panel-card:hover {
+    border-color: var(--lp-border-strong);
+}
+
+.sfa-panel-card.is-active {
+    border-color: var(--lp-text-strong);
+    background: var(--lp-surface-soft);
+}
+
+.sfa-panel-warning {
+    display: flex;
+    gap: 6px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-amber-300);
+    border-radius: var(--lp-radius-compact);
+    background: var(--color-amber-50);
+    color: var(--color-amber-700);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.sfa-panel-primary,
+.sfa-panel-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 42px;
+    border-radius: var(--lp-radius-control);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.sfa-panel-primary {
+    background: var(--lp-text-strong);
+    color: var(--lp-text-inverse);
+}
+
+.sfa-panel-secondary {
+    height: 36px;
+    border: 1px solid var(--lp-border-subtle);
+    color: var(--lp-text-muted);
+    font-size: 13px;
+    font-weight: 400;
+}
+
+.sfa-panel-primary:disabled,
+.sfa-panel-secondary:disabled {
+    cursor: not-allowed;
+    opacity: var(--lp-opacity-disabled);
+}
+
+/* ── 统一的卡片和描边按钮 ──
+ * 卡片统一用 --lp-radius-card，按钮 / 输入框统一用 --lp-radius-control。
+ * 只统一形状，不改颜色，避免覆盖各处的选中、激活状态。 */
+.sfa-card {
+    border: 1px solid var(--lp-border-subtle);
+    border-radius: var(--lp-radius-card);
+    background: var(--lp-surface);
+    box-shadow: var(--lp-shadow-popover);
+}
+
+.sfa-card-soft {
+    border: 1px solid var(--lp-border-subtle);
+    border-radius: var(--lp-radius-control);
+    background: var(--lp-canvas-app);
+}
+
+.sfa-btn-outline,
+.sfa-btn-primary,
+.sfa-panel-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--lp-border-subtle);
+    border-radius: var(--lp-radius-control);
+    color: var(--lp-text-muted);
+    font-size: 13px;
+    white-space: nowrap;
+    transition: border-color 0.15s, color 0.15s, background-color 0.15s;
+}
+
+.sfa-btn-outline:hover:not(:disabled),
+.sfa-panel-secondary:hover:not(:disabled) {
+    border-color: var(--lp-border-strong);
+    color: var(--lp-text-strong);
+}
+
+.sfa-btn-primary {
+    border-color: var(--lp-text-strong);
+    background: var(--lp-text-strong);
+    color: var(--lp-text-inverse);
+    font-weight: 500;
+}
+
+.sfa-btn-primary:hover:not(:disabled) {
+    opacity: 0.9;
+}
+
+.sfa-btn-outline:disabled,
+.sfa-btn-primary:disabled {
+    cursor: not-allowed;
+    opacity: var(--lp-opacity-disabled);
+}
+
+.sfa-btn-sm {
+    height: 28px;
+    padding: 0 10px;
+    font-size: 12px;
+}
+
+.sfa-btn-icon {
+    width: 36px;
+    padding: 0;
+}
+
+/* 面板里的选项按钮、输入框与上面同一套圆角 */
+.sfa-panel-tab,
+.sfa-panel-chip,
+.sfa-panel-input,
+.sfa-panel-card,
+.sfa-panel-warning,
+.sfa-panel-primary {
+    border-radius: var(--lp-radius-control);
+}
+
+/* 全站：带描边的卡片容器统一卡片圆角；带描边的按钮、链接按钮、输入框统一控件圆角（胶囊形保持不变） */
+.sfa-main :is(div, section, article, aside, li, label).border:is(.rounded-xl, .rounded-2xl, .rounded-3xl) {
+    border-radius: var(--lp-radius-card);
+}
+
+.sfa-main :is(button, a).border:not(.rounded-full),
+.sfa-main :is(input, select, textarea).border:not(.rounded-full) {
+    border-radius: var(--lp-radius-control);
 }

@@ -72,6 +72,23 @@ PROVIDERS: Dict[str, Dict[str, Any]] = {
         },
         "secrets": ("access_key", "secret_key"),
     },
+    # RunningHub：运行你自己的「图生视频」工作流（节点编号在 RunningHub 工作流里查看）。
+    "runninghub": {
+        "label": "RunningHub",
+        "fields": {
+            "api_key": "",
+            "base_url": "https://www.runninghub.cn",
+            "workflow_id": "",
+            "image_node_id": "",
+            "image_field": "image",
+            "prompt_node_id": "",
+            "prompt_field": "text",
+            "duration_node_id": "",
+            "duration_field": "duration",
+            "enable_proxy": False,
+        },
+        "secrets": ("api_key",),
+    },
     # Any OpenAI-compatible chat endpoint (vLLM, Ollama, OpenRouter, Moonshot, ...).
     # Register its models with provider: openai_compatible in registry/models.local.yaml
     # or config.yaml custom_models.

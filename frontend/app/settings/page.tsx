@@ -85,6 +85,25 @@ const PROVIDERS: ProviderCard[] = [
     ],
   },
   {
+    id: 'runninghub',
+    name: 'RunningHub',
+    hint: '运行你在 RunningHub 上的图生视频工作流（如 Seedance、Wan 工作流）。节点编号在工作流页面查看',
+    keyFields: [
+      { path: 'api_providers.runninghub.api_key', label: 'API Key', type: 'password' },
+      { path: 'api_providers.runninghub.workflow_id', label: '工作流 ID' },
+      { path: 'api_providers.runninghub.image_node_id', label: '首帧图片节点编号' },
+      { path: 'api_providers.runninghub.prompt_node_id', label: '提示词节点编号' },
+    ],
+    advancedFields: [
+      { path: 'api_providers.runninghub.base_url', label: '接口地址' },
+      { path: 'api_providers.runninghub.image_field', label: '图片字段名（默认 image）' },
+      { path: 'api_providers.runninghub.prompt_field', label: '提示词字段名（默认 text）' },
+      { path: 'api_providers.runninghub.duration_node_id', label: '时长节点编号（选填）' },
+      { path: 'api_providers.runninghub.duration_field', label: '时长字段名（默认 duration）' },
+      { path: 'api_providers.runninghub.enable_proxy', label: '通过代理访问', type: 'boolean' },
+    ],
+  },
+  {
     id: 'deepseek',
     name: 'DeepSeek',
     hint: 'DeepSeek 文本模型',
@@ -442,6 +461,7 @@ export default function SettingsPage() {
                       </div>
                       <div className={`grid gap-3 ${card.keyFields.length > 1 ? 'sm:grid-cols-2' : ''}`}>
                         {card.keyFields.map(field => renderField(field))}
+                        {card.id === 'runninghub' && <RunningHubCheck />}
                       </div>
                     </div>
                   );
@@ -531,6 +551,33 @@ export default function SettingsPage() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+/** 核查 RunningHub 账号：只查 Key 是否可用和余额，不发起生成 */
+function RunningHubCheck() {
+  const [state, setState] = useState<{ loading: boolean; text: string; ok?: boolean }>({ loading: false, text: '' });
+  const check = async () => {
+    setState({ loading: true, text: '' });
+    try {
+      const resp = await fetch('/api/providers/runninghub/account', { method: 'POST' });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data?.detail || '核查失败');
+      const account = data.account || {};
+      const balance = account.remainCoins ?? account.remainMoney ?? account.balance;
+      setState({ loading: false, ok: true, text: balance !== undefined ? `连接正常，剩余：${balance}` : '连接正常' });
+    } catch (error: any) {
+      setState({ loading: false, ok: false, text: error?.message || '核查失败' });
+    }
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+      <button type="button" onClick={check} disabled={state.loading} className="sfa-btn-outline">
+        {state.loading ? '核查中…' : '核查账号 / 余额'}
+      </button>
+      <span className="text-xs text-gray-400">先保存配置再核查；只查询账号，不会生成内容。</span>
+      {state.text && <span className={`text-xs ${state.ok ? 'text-green-600' : 'text-red-600'}`}>{state.text}</span>}
     </div>
   );
 }

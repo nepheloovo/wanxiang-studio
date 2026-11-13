@@ -9,6 +9,7 @@ from .scenarios import router as scenarios_router
 from .sandbox import router as sandbox_router
 from .pipelines import router as pipelines_router
 from .configuration import router as configuration_router
+from .canvas import router as canvas_router
 
 __all__ = [
     "health_router",
@@ -20,4 +21,5 @@ __all__ = [
     "sandbox_router",
     "pipelines_router",
     "configuration_router",
+    "canvas_router",
 ]

@@ -60,7 +60,7 @@ export default function StageProgress({
         />
       </div>
       <p className="mt-2 text-xs text-gray-400">
-        已等待 {elapsedText}。AI 生成通常要几分钟，进度条停一会儿是正常的；可以先离开，稍后在「我的作品」里找回。
+        已等待 {elapsedText}。AI 生成通常要几分钟，进度条停一会儿是正常的；可以先离开，稍后在「作品」里找回。
       </p>
     </div>
   );

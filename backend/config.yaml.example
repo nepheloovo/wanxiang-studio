@@ -42,6 +42,18 @@ api_providers:
     access_key: ''
     secret_key: ''
     enable_proxy: false
+  # RunningHub: runs your own image-to-video workflow. Node ids come from the workflow on RunningHub.
+  runninghub:
+    api_key: ''
+    base_url: https://www.runninghub.cn
+    workflow_id: ''
+    image_node_id: ''
+    image_field: image
+    prompt_node_id: ''
+    prompt_field: text
+    duration_node_id: ''
+    duration_field: duration
+    enable_proxy: false
   # Any OpenAI-compatible endpoint (vLLM, Ollama, OpenRouter, ...). Register its models under
   # custom_models below with provider: openai_compatible.
   openai_compatible:

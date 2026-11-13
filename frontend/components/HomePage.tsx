@@ -938,7 +938,7 @@ export default function HomePage({ onStartProject, onResumeProject, onDeleteSess
               </dd></div>
             </dl>
             <p className="mt-3 text-[11px] leading-relaxed text-gray-400">
-              会消耗你在「设置」里填写的模型服务额度。生成中可以离开页面，之后在「我的作品」里找回。
+              会消耗你在「设置」里填写的模型服务额度。生成中可以离开页面，之后在「作品」里找回。
             </p>
             <div className="mt-5 flex gap-2">
               <button

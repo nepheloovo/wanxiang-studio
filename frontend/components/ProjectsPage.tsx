@@ -44,7 +44,7 @@ function pipelineTitle(task: PipelineTask): string {
   return String(output.title || input.title || input.goods_title || input.text || input.prompt_text || input.goods_text || '未命名任务');
 }
 
-export default function ProjectsPage() {
+export default function ProjectsPage({ embedded = false }: { embedded?: boolean } = {}) {
   const router = useRouter();
   const [sessions, setSessions] = useState<any[]>([]);
   const [pipelines, setPipelines] = useState<PipelineTask[]>([]);
@@ -117,20 +117,20 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <BrandHeader title="我的作品" />
+    <div className={embedded ? '' : 'min-h-screen bg-gray-50'}>
+      {!embedded && <BrandHeader title="我的作品" />}
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
         <div className="mb-6 flex items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">我的作品</h1>
-            <p className="mt-1 text-sm text-gray-500">所有创作过的项目都在这里，点开可以继续做。</p>
+            <h1 className="text-2xl font-bold text-gray-900">{embedded ? '视频项目' : '我的作品'}</h1>
+            <p className="mt-1 text-sm text-gray-500">所有创作过的视频项目都在这里，点开可以继续做。</p>
           </div>
           <Link
             href="/"
             className="inline-flex h-10 flex-shrink-0 items-center gap-1.5 rounded-xl bg-neutral-900 px-4 text-sm font-medium text-white hover:bg-neutral-700"
           >
             <Plus className="h-4 w-4" />
-            新建作品
+            新建项目
           </Link>
         </div>
 

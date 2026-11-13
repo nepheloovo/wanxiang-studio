@@ -609,6 +609,30 @@ models:
       - text
       - image
       api_contract_verified: false
+  runninghub-i2v:
+    name: RunningHub 工作流（图生视频）
+    provider: runninghub
+    type:
+    - video
+    concurrency: 2
+    capabilities:
+      ability_type: image_to_video
+      ability_types:
+      - image_to_video
+      adapter_ability_types:
+      - first_frame_i2v
+      input_modalities:
+      - text
+      - image
+      adapter_input_modalities:
+      - text
+      - image
+      api_contract_verified: false
+      duration:
+        min: 3
+        max: 15
+        integer: true
+        verified: false
   kling-v2-5-turbo:
     name: Kling V2.5 Turbo
     provider: kling

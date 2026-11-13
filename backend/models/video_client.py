@@ -184,6 +184,11 @@ class VideoClient:
             elif "wan" in model_lower or "happyhorse" in model_lower:
                 provider = "dashscope"
 
+        if provider == "runninghub":
+            from models.video_runninghub import RunningHubVideoClient
+
+            logger.info("VideoClient routed to RunningHub: model=%s", model)
+            return RunningHubVideoClient().generate_video(prompt, image_path, save_path, duration)
         if provider == "kling":
             return self._generate_kling(
                 prompt,

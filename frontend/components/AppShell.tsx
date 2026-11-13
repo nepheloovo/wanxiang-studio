@@ -2,35 +2,26 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { CheckCircle2, ChevronLeft, ChevronRight, Clapperboard, Clock, FolderOpen, Hexagon, Home, Loader2, Repeat2, Settings, Trash2, UserRound } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Clapperboard, Clock, Hexagon, Home, Images, ListChecks, Loader2, Repeat2, Settings, Square, Trash2, UserRound, Wrench } from 'lucide-react';
 import clsx from 'clsx';
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { clearTempCache, fetchPipelineTasks, fetchSandboxTasks, fetchScenarios, fetchSessions, type PipelineTask, type SandboxTask } from '@/lib/workflowApi';
 import { sessionReviewState, stageLabel, type StageNameMap } from '@/lib/sessionState';
 import { brand } from '@/config/brand';
 
-/** 导航分组：主线（开始创作 / 我的作品）在前，快捷工具和单项工具在后 */
-const NAV_SECTIONS: Array<{ title?: string; items: Array<{ href: string; label: string; icon: typeof Home }> }> = [
-  {
-    items: [
-      { href: '/', label: '开始创作', icon: Home },
-      { href: '/projects', label: '我的作品', icon: FolderOpen },
-    ],
-  },
-  {
-    title: '一键快捷工具',
-    items: [
-      { href: '/pipelines/standard', label: '文艺短视频', icon: Clapperboard },
-      { href: '/pipelines/digital-human', label: '数字人口播', icon: UserRound },
-      { href: '/pipelines/action-transfer', label: '动作迁移', icon: Repeat2 },
-    ],
-  },
-  {
-    title: '单项能力',
-    items: [
-      { href: '/sandbox', label: 'AI 工具箱', icon: Hexagon },
-    ],
-  },
+/** 顶部主导航：首页（分步创作）/ 画布 / 作品 */
+const MAIN_NAV: Array<{ href: string; label: string; icon: typeof Home }> = [
+  { href: '/', label: '首页', icon: Home },
+  { href: '/canvas', label: '画布', icon: Square },
+  { href: '/projects', label: '作品', icon: Images },
+];
+
+/** 「工具」下拉：一键快捷工具 + 单项能力 */
+const TOOL_ITEMS: Array<{ href: string; label: string; desc: string; icon: typeof Home }> = [
+  { href: '/pipelines/standard', label: '文艺短视频', desc: '一段文字直接出短视频', icon: Clapperboard },
+  { href: '/pipelines/digital-human', label: '数字人口播', desc: '人像 + 文案生成口播', icon: UserRound },
+  { href: '/pipelines/action-transfer', label: '动作迁移', desc: '让图中人物做视频里的动作', icon: Repeat2 },
+  { href: '/sandbox', label: 'AI 工具箱', desc: '单独试用文字、看图、画图、视频', icon: Hexagon },
 ];
 
 const SETTINGS_ITEM = { href: '/settings', label: '设置', icon: Settings };
@@ -74,7 +65,6 @@ type RunningTaskItem = {
 };
 
 const COMPLETED_TASK_DISMISS_KEY = `${brand.storagePrefix}.dismissed-completed-tasks`;
-const SIDEBAR_OPEN_KEY = `${brand.storagePrefix}.sidebar-open`;
 
 /** 会话所属场景的阶段数：优先用 stage_ids，旧数据回退到 status 的键数 */
 function sessionStageCount(session: { stage_ids?: unknown; status?: Record<string, unknown> }): number {
@@ -175,19 +165,6 @@ function saveDismissedCompletedTasks(ids: Set<string>) {
   window.localStorage.setItem(COMPLETED_TASK_DISMISS_KEY, JSON.stringify(Array.from(ids)));
 }
 
-function loadSidebarOpen(): boolean {
-  if (typeof window === 'undefined') return true;
-  // 窄屏（平板 / 手机）侧栏会盖住内容，进入页面时一律收起
-  if (window.innerWidth < 1104) return false;
-  const stored = window.localStorage.getItem(SIDEBAR_OPEN_KEY);
-  return stored === null ? true : stored === 'true';
-}
-
-function saveSidebarOpen(open: boolean) {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(SIDEBAR_OPEN_KEY, open ? 'true' : 'false');
-}
-
 function TaskPanel({
   title,
   icon,
@@ -255,7 +232,7 @@ function TaskPanel({
   );
 }
 
-function SidebarTaskPanels({ currentPath }: { currentPath: string }) {
+function SidebarTaskPanels({ currentPath, onCountChange }: { currentPath: string; onCountChange?: (count: number) => void }) {
   const router = useRouter();
   const [runningTasks, setRunningTasks] = useState<RunningTaskItem[]>([]);
   const [completedTasks, setCompletedTasks] = useState<RunningTaskItem[]>([]);
@@ -299,6 +276,10 @@ function SidebarTaskPanels({ currentPath }: { currentPath: string }) {
   };
 
   useEffect(() => {
+    onCountChange?.(runningTasks.length + completedTasks.filter(task => task.status === 'waiting').length);
+  }, [runningTasks, completedTasks, onCountChange]);
+
+  useEffect(() => {
     load().catch(() => {});
     const timer = window.setInterval(() => load().catch(() => {}), 3000);
     return () => window.clearInterval(timer);
@@ -337,7 +318,7 @@ function SidebarTaskPanels({ currentPath }: { currentPath: string }) {
         icon={<CheckCircle2 className="h-3.5 w-3.5 text-gray-400" />}
         tasks={completedTasks}
         currentPath={currentPath}
-        emptyText="暂无。全部项目在「我的作品」"
+        emptyText="暂无。全部项目在「作品」"
         onTaskClick={handleCompletedClick}
       />
     </>
@@ -347,33 +328,29 @@ function SidebarTaskPanels({ currentPath }: { currentPath: string }) {
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [open, setOpen] = useState(true);
-  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
+  const [menu, setMenu] = useState<null | 'tools' | 'tasks' | 'settings'>(null);
+  const [taskCount, setTaskCount] = useState(0);
   const [clearingCache, setClearingCache] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const isCanvas = pathname.startsWith('/canvas');
+
+  useEffect(() => { setMenu(null); }, [pathname]);
 
   useEffect(() => {
-    setOpen(loadSidebarOpen());
-  }, []);
-
-  const isNarrow = () => typeof window !== 'undefined' && window.innerWidth < 1104;
-
-  const setSidebarOpen = (nextOpen: boolean) => {
-    setOpen(nextOpen);
-    // 窄屏上的开关不记住，避免回到电脑上时状态错乱
-    if (!isNarrow()) saveSidebarOpen(nextOpen);
-  };
-
-  // 窄屏上点了导航就自动收起侧栏
-  useEffect(() => {
-    if (isNarrow()) setOpen(false);
-  }, [pathname]);
+    if (!menu) return;
+    const close = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setMenu(null);
+    };
+    window.addEventListener('mousedown', close);
+    return () => window.removeEventListener('mousedown', close);
+  }, [menu]);
 
   const handleClearCache = async () => {
     setClearingCache(true);
     try {
       const result = await clearTempCache();
       window.alert(`缓存已清空，删除 ${result.deleted} 项，释放 ${Number(result.freed_mb || 0).toFixed(2)} MB。`);
-      setSettingsMenuOpen(false);
+      setMenu(null);
     } catch (error: any) {
       window.alert(error?.message || '清空缓存失败');
     } finally {
@@ -381,140 +358,84 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const toolActive = TOOL_ITEMS.some(item => pathname.startsWith(item.href));
+  const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
+
   return (
-    <div
-      className="sfa-shell min-h-screen bg-gray-50 text-gray-800"
-      style={{ '--app-sidebar-width': open ? '15.5rem' : '0px' } as CSSProperties}
-    >
-      {open && (
-        <div
-          className="sfa-sidebar-scrim fixed inset-0 z-30 bg-black/50 min-[1104px]:hidden"
-          onClick={() => setSidebarOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-      <aside
-        data-open={open ? 'true' : 'false'}
-        className={clsx(
-          'sfa-sidebar fixed inset-y-0 left-0 z-40 border-r border-gray-200 bg-white shadow-sm transition-all duration-300',
-          !open && 'border-r-0'
-        )}
-        style={{ width: open ? 'var(--app-sidebar-width)' : '0px' }}
-      >
-        <div className={clsx('flex h-full flex-col overflow-hidden transition-opacity duration-200', open ? 'opacity-100' : 'opacity-0')}>
-          <div className="sfa-sidebar-brand flex h-16 items-center px-4 border-b border-gray-100">
-            <div className="flex items-center min-w-0">
-              <span className="text-base font-semibold text-gray-900 truncate">{brand.name}</span>
-            </div>
-          </div>
-          <nav className="sfa-sidebar-nav min-h-0 flex-1 overflow-y-auto p-3">
-            {NAV_SECTIONS.map((section, sectionIndex) => (
-              <div key={section.title || sectionIndex} className={clsx(sectionIndex > 0 && 'pt-3')}>
-                {section.title && (
-                  <div className="px-3 pb-1 text-[11px] font-medium text-gray-400">{section.title}</div>
-                )}
-                <div className="space-y-1">
-                  {section.items.map(item => {
-                    const Icon = item.icon;
-                    const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={clsx(
-                          'sfa-sidebar-link flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
-                          active
-                            ? 'bg-cream/5 text-neutral-900'
-                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
-                        )}
-                      >
-                        <Icon className="w-4 h-4 flex-shrink-0" />
-                        <span className="truncate">{item.label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
+    <div className="sfa-shell min-h-screen bg-gray-50 text-gray-800" style={{ '--app-sidebar-width': '0px' } as CSSProperties}>
+      <nav className="sfa-topnav" ref={menuRef}>
+        <Link href="/" className="sfa-topnav-brand">
+          <span className="sfa-topnav-logo">{brand.name.slice(0, 1)}</span>
+          <span className="sfa-topnav-name">{brand.name}</span>
+        </Link>
+
+        <div className="sfa-topnav-main">
+          {MAIN_NAV.map(item => {
+            const Icon = item.icon;
+            return (
+              <Link key={item.href} href={item.href} className={clsx('sfa-topnav-link', isActive(item.href) && 'is-active')}>
+                <Icon className="h-4 w-4" />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+          <div className="relative">
+            <button type="button" onClick={() => setMenu(menu === 'tools' ? null : 'tools')} className={clsx('sfa-topnav-link', (toolActive || menu === 'tools') && 'is-active')}>
+              <Wrench className="h-4 w-4" />
+              <span>工具</span>
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+            {menu === 'tools' && (
+              <div className="sfa-topnav-menu left-0 w-72">
+                {TOOL_ITEMS.map(item => {
+                  const Icon = item.icon;
+                  return (
+                    <Link key={item.href} href={item.href} className={clsx('sfa-topnav-menu-item', pathname.startsWith(item.href) && 'is-active')}>
+                      <Icon className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                      <span className="min-w-0">
+                        <span className="block text-sm">{item.label}</span>
+                        <span className="block text-xs text-gray-400">{item.desc}</span>
+                      </span>
+                    </Link>
+                  );
+                })}
               </div>
-            ))}
-          </nav>
-          <SidebarTaskPanels currentPath={pathname} />
-          <div className="sfa-sidebar-footer relative border-t border-gray-100 p-3">
-            {(() => {
-              const Icon = SETTINGS_ITEM.icon;
-              const active = pathname.startsWith(SETTINGS_ITEM.href);
-              return (
-                <>
-                  {settingsMenuOpen && (
-                    <div className="sfa-settings-menu absolute bottom-[62px] left-3 right-3 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSettingsMenuOpen(false);
-                          router.push(SETTINGS_ITEM.href);
-                        }}
-                        className="flex h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-medium text-gray-600 hover:bg-cream/5 hover:text-neutral-700"
-                      >
-                        <Settings className="h-4 w-4" />
-                        修改配置
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleClearCache()}
-                        disabled={clearingCache}
-                        className="mt-1 flex h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {clearingCache ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                        清空缓存
-                      </button>
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setSettingsMenuOpen(value => !value)}
-                  className={clsx(
-                    'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
-                    active || settingsMenuOpen
-                      ? 'bg-cream/5 text-neutral-900'
-                      : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
-                  )}
-                >
-                  <Icon className="w-4 h-4 flex-shrink-0" />
-                  <span className="truncate">{SETTINGS_ITEM.label}</span>
-                  </button>
-                </>
-              );
-            })()}
+            )}
           </div>
         </div>
-      </aside>
 
-      {open && (
-        <button
-          onClick={() => setSidebarOpen(false)}
-          className="sfa-sidebar-toggle fixed top-1/2 z-50 h-14 w-7 -translate-y-1/2 rounded-r-xl border border-l-0 border-gray-200 bg-white text-gray-400 shadow-sm hover:w-9 hover:text-gray-900 hover:border-gray-300 hover:bg-white flex items-center justify-center transition-all"
-          style={{ left: 'calc(var(--app-sidebar-width) - 1px)' }}
-          title="收起侧边栏"
-          aria-label="收起侧边栏"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-      )}
+        <div className="sfa-topnav-actions">
+          <div className="relative">
+            <button type="button" onClick={() => setMenu(menu === 'tasks' ? null : 'tasks')} className={clsx('sfa-topnav-icon', menu === 'tasks' && 'is-active')} title="任务" aria-label="任务">
+              <ListChecks className="h-4 w-4" />
+              <span className="hidden sm:inline">任务</span>
+              {taskCount > 0 && <span className="sfa-topnav-badge">{taskCount}</span>}
+            </button>
+            <div className={clsx('sfa-topnav-menu right-0 w-80 !p-0', menu !== 'tasks' && 'hidden')}>
+              <SidebarTaskPanels currentPath={pathname} onCountChange={setTaskCount} />
+            </div>
+          </div>
+          <div className="relative">
+            <button type="button" onClick={() => setMenu(menu === 'settings' ? null : 'settings')} className={clsx('sfa-topnav-icon', (menu === 'settings' || pathname.startsWith(SETTINGS_ITEM.href)) && 'is-active')} title="设置" aria-label="设置">
+              <Settings className="h-4 w-4" />
+            </button>
+            {menu === 'settings' && (
+              <div className="sfa-topnav-menu right-0 w-44">
+                <button type="button" onClick={() => router.push(SETTINGS_ITEM.href)} className="sfa-topnav-menu-item">
+                  <Settings className="h-4 w-4" />
+                  修改配置
+                </button>
+                <button type="button" onClick={() => handleClearCache()} disabled={clearingCache} className="sfa-topnav-menu-item disabled:opacity-60">
+                  {clearingCache ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  清空缓存
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </nav>
 
-      {!open && (
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="fixed left-0 top-1/2 z-50 h-14 w-7 -translate-y-1/2 rounded-r-xl border border-l-0 border-gray-200 bg-white text-gray-400 shadow-sm hover:w-9 hover:text-neutral-700 hover:border-cream/15 hover:bg-cream/5 flex items-center justify-center transition-all"
-          title="打开侧边栏"
-          aria-label="打开侧边栏"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </button>
-      )}
-
-      <main
-        className="sfa-main min-h-screen min-w-0 overflow-x-hidden transition-[margin] duration-300"
-        style={{ marginLeft: open ? 'var(--app-sidebar-width)' : '0px' }}
-      >
+      <main className={clsx('sfa-main min-w-0 overflow-x-hidden', isCanvas && 'sfa-main-canvas')}>
         {children}
       </main>
     </div>

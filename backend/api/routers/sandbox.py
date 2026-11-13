@@ -175,6 +175,62 @@ def _delete_record_files(files: List[str]):
                 pass
 
 
+RESOLUTION_PRESETS = {"720P", "1080P", "2K"}
+MAX_IMAGE_PIXELS = 2048 * 2048
+MIN_IMAGE_PIXELS = 768 * 768  # 百炼图像模型的下限
+OUTPUT_FORMATS = {"png": ("PNG", ".png"), "jpeg": ("JPEG", ".jpg"), "webp": ("WEBP", ".webp")}
+
+
+def validate_image_resolution(value: str | None) -> str:
+    """画质档位或自定义尺寸「宽*高」；自定义尺寸限制在模型支持的像素范围内。"""
+    if not value:
+        return "2K"
+    text = str(value).strip().upper().replace("X", "*")
+    if text in RESOLUTION_PRESETS:
+        return text
+    parts = text.split("*")
+    if len(parts) != 2 or not all(part.isdigit() for part in parts):
+        raise HTTPException(status_code=400, detail="尺寸格式应为 宽*高，例如 1200*1600")
+    width, height = int(parts[0]), int(parts[1])
+    if not (512 <= width <= 4096 and 512 <= height <= 4096):
+        raise HTTPException(status_code=400, detail="宽和高都需要在 512 到 4096 之间")
+    if width * height < MIN_IMAGE_PIXELS:
+        raise HTTPException(status_code=400, detail="尺寸太小：宽 × 高不能低于 768 × 768 的像素总数")
+    if width * height > MAX_IMAGE_PIXELS:
+        raise HTTPException(status_code=400, detail="尺寸太大：宽 × 高不能超过 2048 × 2048 的像素总数")
+    return f"{width}*{height}"
+
+
+def convert_output_format(paths: List[str], output_format: str | None) -> List[str]:
+    """把生成的图片转成指定格式，返回新路径；转换失败时保留原图。"""
+    fmt = (output_format or "").lower()
+    if fmt not in OUTPUT_FORMATS:
+        return paths
+    from PIL import Image
+
+    pil_format, ext = OUTPUT_FORMATS[fmt]
+    converted: List[str] = []
+    for path in paths:
+        base, current_ext = os.path.splitext(path)
+        if current_ext.lower() == ext or (fmt == "jpeg" and current_ext.lower() == ".jpeg"):
+            converted.append(path)
+            continue
+        target = f"{base}{ext}"
+        try:
+            with Image.open(path) as img:
+                if pil_format == "JPEG":
+                    img = img.convert("RGB")
+                    img.save(target, pil_format, quality=92)
+                else:
+                    img.save(target, pil_format, **({"quality": 90} if pil_format == "WEBP" else {}))
+            os.remove(path)
+            converted.append(target)
+        except Exception:
+            logger.warning("Failed to convert %s to %s", path, fmt, exc_info=True)
+            converted.append(path)
+    return converted
+
+
 # 请求模型
 @router.get("/api/sandbox/history")
 async def sandbox_get_history():
@@ -309,7 +365,8 @@ async def sandbox_t2i(req: SandboxT2IRequest):
     """临时工作台 - 文生图"""
     from models.image_client import ImageClient
     client = ImageClient()
-    input_data = {"prompt": req.prompt, "style": req.style, "ratio": req.ratio}
+    resolution = validate_image_resolution(req.resolution)
+    input_data = {"prompt": req.prompt, "style": req.style, "ratio": req.ratio, "resolution": resolution}
     task_id = _start_active_task("t2i", req.model, input_data)
     try:
         logger.info("Sandbox T2I started: model=%s ratio=%s", req.model, req.ratio)
@@ -319,7 +376,9 @@ async def sandbox_t2i(req: SandboxT2IRequest):
             model=req.model,
             image_paths=None,
             video_ratio=req.ratio,
+            resolution=resolution,
         )
+        result = convert_output_format(result if isinstance(result, list) else [], req.output_format)
         # result 是图片路径列表
         # 保存到历史记录
         record_id = _add_record(
@@ -354,7 +413,8 @@ async def sandbox_i2i(req: SandboxI2IRequest):
     from models.image_client import ImageClient
     client = ImageClient()
     image = _validated_media_reference(req.image)
-    input_data = {"prompt": req.prompt, "reference_image": image}
+    resolution = validate_image_resolution(req.resolution)
+    input_data = {"prompt": req.prompt, "reference_image": image, "ratio": req.ratio, "resolution": resolution}
     task_id = _start_active_task("i2i", req.model, input_data)
     try:
         logger.info("Sandbox I2I started: model=%s ratio=%s", req.model, req.ratio)
@@ -364,7 +424,9 @@ async def sandbox_i2i(req: SandboxI2IRequest):
             image_paths=[image],
             model=req.model,
             video_ratio=req.ratio,
+            resolution=resolution,
         )
+        result = convert_output_format(result if isinstance(result, list) else [], req.output_format)
         # 保存到历史记录
         record_id = _add_record(
             tool="i2i",

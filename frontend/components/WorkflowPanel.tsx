@@ -22,6 +22,7 @@ import {
 } from '@/lib/workflowApi';
 import TopBar, { type ModelConfig } from './TopBar';
 import HomePage, { type ProjectParams } from './HomePage';
+import { PENDING_START_KEY } from '@/lib/canvasApi';
 import {
   ScriptStage,
   CharacterStage,
@@ -651,6 +652,23 @@ export default function WorkflowPanel() {
   };
 
   // ── 确认阶段并继续 ──
+  // 从画布「视频创作」启动：参数由画布页放在 sessionStorage 里，只启动一次
+  const canvasStartRef = useRef(false);
+  useEffect(() => {
+    if (searchParams.get('start') !== 'canvas' || canvasStartRef.current) return;
+    canvasStartRef.current = true;
+    let pending: { params: ProjectParams; auto: boolean } | null = null;
+    try {
+      const raw = window.sessionStorage.getItem(PENDING_START_KEY);
+      window.sessionStorage.removeItem(PENDING_START_KEY);
+      pending = raw ? JSON.parse(raw) : null;
+    } catch {
+      pending = null;
+    }
+    router.replace('/');
+    if (pending?.params?.idea) handleStartProject(pending.params, Boolean(pending.auto));
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleConfirmStage = async (stageId: string) => {
     if (!sessionId || isRunning) return;
     setIsRunning(true);
